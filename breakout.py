@@ -1,7 +1,7 @@
 import pygame
 
 
-pygame.init()
+pygame.init() # Random comment
 
 clock = pygame.time.Clock()
 fps = 30
