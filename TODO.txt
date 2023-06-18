@@ -1,7 +1,8 @@
 X Limit paddle movement to screen edge
 X Scale everything to the window in render()
-Implement ball
+X Implement ball
 Implement blocks and their collision detection
-Implement the basic game
+Implement the basic game - a game over screen, a game win screen
+Implement sound
 Implement pausing
 Implement Menu screen and game restarting
