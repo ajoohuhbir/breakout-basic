@@ -1,5 +1,5 @@
-Limit paddle movement to screen edge
-Scale everything to the window in render()
+X Limit paddle movement to screen edge
+X Scale everything to the window in render()
 Implement ball
 Implement blocks and their collision detection
 Implement the basic game
