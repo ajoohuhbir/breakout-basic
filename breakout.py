@@ -4,7 +4,7 @@ import pygame
 pygame.init() # Random comment
 
 clock = pygame.time.Clock()
-fps = 30
+fps = 60
 
 HEIGHT = 600
 WIDTH = 800
@@ -20,8 +20,8 @@ paddle_y = 9*HEIGHT//10
 paddle_x_vel = 0
 
 user_impulse = 0
-user_impulse_per_millisecond = 10
-paddle_max_speed_per_millisecond = 0.25
+user_impulse_per_millisecond = 0.01
+paddle_max_speed_per_millisecond = 0.5
 air_resistance_coefficient = user_impulse_per_millisecond/paddle_max_speed_per_millisecond
 
 last_movement_key_pressed = None
@@ -43,14 +43,15 @@ def render():
 def update(delta_t):
     global paddle_x, paddle_y, paddle_x_vel, user_impulse_per_millisecond, last_movement_key_pressed, air_resistance_coefficient
     if last_movement_key_pressed == 'A':
-        impulse_sign = 1
-    elif last_movement_key_pressed == 'D':
         impulse_sign = -1
+    elif last_movement_key_pressed == 'D':
+        impulse_sign = +1
     else:
         impulse_sign = 0
     
     paddle_x_vel += delta_t*(impulse_sign*user_impulse_per_millisecond - air_resistance_coefficient*paddle_x_vel)
     paddle_x += delta_t * paddle_x_vel
+    # print([paddle_x_vel,impulse_sign*user_impulse_per_millisecond - air_resistance_coefficient*paddle_x_vel])
 
 def handle_input():
     global game_exit, last_movement_key_pressed
@@ -79,7 +80,13 @@ def GameLoop():
         render()
         handle_input()
 
-        update(clock.get_time())
+        total_delta_t = clock.get_time()
+        N = 50
+        for i in range(N):
+            update(total_delta_t/N)
+        
+        # print(total_delta_t)
+
 
         clock.tick(fps)
 
