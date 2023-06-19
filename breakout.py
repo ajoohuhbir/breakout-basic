@@ -44,7 +44,7 @@ class Ball:
         self.x = x
         self.y = y
         self.x_vel = random.uniform(-0.05, 0.05)
-        self.y_vel = -0.3
+        self.y_vel = -0.33
         self.radius = 5
         self.color = (255,255,255)
     
@@ -54,10 +54,10 @@ class Ball:
         self.x += self.x_vel
         self.paddle_collision()
         self.wall_collision()
+        for block in blocks:
+            self.block_collision(block)
     
     def render(self): # It is somewhat clunky to deal with scaling here, instead of in render, but I don't have a cleaner solution
-        global screen
-        # pygame.draw.circle(screen, self.color, (scale_x(self.x), scale_y(self.y)), scale_y(self.radius))
         pygame.draw.circle(screen, self.color, (scale_x(self.x), scale_y(self.y)), scale_y(self.radius))   
         # print("render got called!")
 
@@ -77,8 +77,36 @@ class Ball:
             self.x_vel *= -1
         elif self.x > GAME_WIDTH - self.radius and self.x_vel > 0:
             self.x_vel *= -1
+        if self.y < self.radius and self.y_vel < 0:
+            self.y_vel *= -1
+    
+    def block_collision(self, block):
+        if block.x - self.radius < self.x < block.x + block.width + self.radius and block.y - self.radius < self.y < block.y + block.height + self.radius:
+            if self.y > block.y + block.height and self.y_vel < 0:
+                self.y_vel *= -1
+                blocks.remove(block)
+            elif self.y < block.y and self.y_vel > 0:
+                self.y_vel *= -1
+                blocks.remove(block)
+            elif self.x > block.x + block.width and self.x_vel < 0:
+                self.x_vel *= -1
+                blocks.remove(block)
+            elif self.x < block.x and self.x_vel > 0:
+                self.x_vel *= -1
+                blocks.remove(block)
 
 
+class Block:
+
+    def __init__(self, x, y, width, height, color):
+        self.x = x
+        self.y = y
+        self.height = height
+        self.width = width
+        self.color = color
+    
+    def render(self):
+        pygame.draw.rect(screen, self.color ,[scale_x(self.x), scale_y(self.y), scale_x(self.width), scale_y(self.height)])
 
 
 def scale_x(x_coord):
@@ -93,6 +121,8 @@ def render():
     draw_paddle(scale_x(paddle_x), scale_y(paddle_y), scale_x(PADDLE_WIDTH), scale_y(PADDLE_HEIGHT))
     for ball in balls:
         ball.render()
+    for block in blocks:
+        block.render()
     pygame.display.update()
 
 def update(delta_t):
@@ -111,8 +141,6 @@ def update(delta_t):
         paddle_x = GAME_WIDTH - PADDLE_WIDTH
     elif paddle_x < 0:
         paddle_x = 0
-
-    # print([paddle_x_vel,impulse_sign*user_impulse_per_millisecond - air_resistance_coefficient*paddle_x_vel])
 
     for ball in balls:
         ball.update(delta_t)
@@ -135,6 +163,10 @@ def handle_input():
 
 
 balls = [Ball(GAME_WIDTH/2, paddle_y - 20)]  # this should DEFINITELY not be global
+blocks = []
+for i in range(8):
+    for j in range(4):
+        blocks.append(Block(100*i + 2, 50*j +2, 95, 45, tuple((random.randint(0, 255) for i in range(3)))))
 
 def GameLoop():
 
