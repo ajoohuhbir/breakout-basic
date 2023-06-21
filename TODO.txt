@@ -9,8 +9,12 @@ X Implement instructions
 X Implement Menu screen and game restarting
 X Implement music
 
+Implement resolution black rectangles
 
-Separation:
+
+Separation issues:
+
+can't get color out of block
 
 
 
@@ -24,3 +28,5 @@ X Flickering pause screen
 QUESTIONS:
 
 Isn't rendering only the changing parts of a screen more "efficient"?
+GameObjects inheritance
+Should I use sets in the input handler? Is that better?

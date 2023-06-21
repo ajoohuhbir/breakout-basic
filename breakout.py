@@ -1,19 +1,6 @@
 import pygame
 import random
 
-screen = pygame.display.set_mode((RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
-
-GAME_HEIGHT = 600
-GAME_WIDTH = 800
-
-PADDLE_WIDTH = 100
-PADDLE_HEIGHT = 10
-PADDLE_COLOR = (255, 255, 255)
-
-paddle_x = GAME_WIDTH / 2 - PADDLE_WIDTH / 2
-paddle_y = 0.9 * GAME_HEIGHT
-paddle_x_vel = 0
-
 user_impulse = 0
 user_impulse_per_millisecond = 0.01
 
@@ -51,46 +38,119 @@ class Music:
         self.victory = "win music.mp3"
 
 
+class AudioInstructions:
+    def __init__(self):
+        self.music = Music()
+        self.sounds = Sounds()
+        self.sound_queue = []
+        self.new_music = None
+
+    def queue_sound(self, sound):
+        self.sound_queue.append(sound)
+
+    def queue_music_change(self, music):
+        self.new_music = music
+
+
 class Audio:
     def __init__(self):
-        self.sounds = Sounds()
-        self.music = Music()
         self.player = pygame.mixer.music
         self.player.load(self.music.menu)
-        self.sound_queue = []
-        self.music_instruction = None
 
     def change_music(self, music):
         self.player.unload()
         self.player.load(music)
         self.player.play()
 
-    def queue_sound(self, sound):
-        self.sound_queue.append(sound)
+    def run(self, instructions: AudioInstructions):
+        for sound in instructions.sound_queue:
+            sound.play()
 
-    def queue_music_change(self, music):
-        self.music_instruction = music
-
-    def run(self):
-        for sound in self.sound_queue:
-            sound.play
-        self.sound_queue = []
-
-        if self.music_instruction != None:
+        if instructions.new_music != None:
             self.change_music(self.music_instruction)
-            self.music_instruction = None
 
 
-def draw_paddle(
-    paddle_x,
-    paddle_y,
-    paddle_width=PADDLE_WIDTH,
-    paddle_height=PADDLE_HEIGHT,
-    paddle_color=PADDLE_COLOR,
-):
-    pygame.draw.rect(
-        screen, paddle_color, [paddle_x, paddle_y, paddle_width, paddle_height]
-    )
+class Message:
+    def __init__(
+        self, msg, size, x, y, font="arial", color=(255, 255, 255)
+    ):  # This DOES mean that the game state has to "know" about colors and fonts
+        self.msg = msg
+        self.size = size
+        self.x = x
+        self.y = y
+        self.font = font
+        self.color = color
+
+    def msg_screen(self):
+        surf = pygame.font.SysFont(self.font, self.size).render(
+            self.msg, True, self.color
+        )
+        trect = surf.get_rect()
+        trect.center = self.x, self.y
+        screen.blit(surf, trect)
+
+
+class GraphicsInstructions:
+    def __init__(self):
+        self.objects_to_render = []
+        self.messages_to_display = []
+
+    def msg_screen(self, msg: Message):
+        self.messages_to_display.append(msg)
+
+    def render_object(self, obj):
+        self.objects_to_render.append(obj)
+
+
+class Graphics:  # Does not yet support different resolutions
+    def __init__(self, resolution_width, resolution_height):
+        self.screen = pygame.display.set_mode((resolution_width, resolution_height))
+        self.paddle_color = (255, 255, 255)
+
+    def render_paddle(self, paddle):
+        pygame.draw.rect(
+            self.screen,
+            self.paddle_color,
+            [paddle.x, paddle.y, paddle.width, paddle.height],
+        )
+
+    def render_block(self, block):
+        pygame.draw.rect(
+            self.screen,
+            block,
+            [block.x, block.y, block.width, block.height],
+        )
+
+    def render_ball(self, ball):
+        pygame.draw.circle(self.screen, self.ball_color, (ball.x, ball.y), ball.radius)
+
+    def render_object(self, obj):
+        if type(obj) == Block:
+            self.render_block(obj)
+        elif type(obj) == Ball:
+            self.render_ball(obj)
+        elif type(obj) == Paddle:
+            self.render_paddle(obj)
+
+    def render(self, instructions: GraphicsInstructions):
+        self.screen.fill((0, 0, 0))
+
+        for obj in instructions.objects_to_render:
+            self.render_object(obj)
+
+        for msg in instructions.messages_to_display:
+            msg.msg_screen()
+
+        pygame.display.update()
+
+
+class Paddle:
+    def __init__(self, x, y, height, width):
+        self.x = x
+        self.y = y
+        self.height = height
+        self.width = width
+        self.x_vel = 0
 
 
 class Ball:
@@ -123,13 +183,6 @@ class Ball:
             music_player.play()
 
             game_screen = "game over"
-
-    def render(
-        self,
-    ):  # It is somewhat clunky to deal with scaling here, instead of in render, but I don't have a cleaner solution
-        pygame.draw.circle(
-            screen, self.color, (scale_x(self.x), scale_y(self.y)), scale_y(self.radius)
-        )
 
     def paddle_collision(self):
         if self.y >= paddle_y and self.y <= paddle_y + PADDLE_HEIGHT:
@@ -177,41 +230,31 @@ class Block:
         self.width = width
         self.color = color
 
-    def render(self):
-        pygame.draw.rect(
-            screen,
-            self.color,
-            [
-                scale_x(self.x),
-                scale_y(self.y),
-                scale_x(self.width),
-                scale_y(self.height),
-            ],
-        )
 
+class InputHandler:
+    def __init__(self):
+        self.new_keys_pressed = []
+        self.currently_pressed_keys = []
+        self.quit = False
 
-def scale_x(x_coord):
-    return (x_coord / GAME_WIDTH) * RESOLUTION_WIDTH
+    def handle_input(self):
+        self.currently_pressed_keys.extend(self.new_keys_pressed)
+        self.new_keys_pressed = []
 
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key not in self.currently_pressed_keys:
+                    self.new_keys_pressed.append(event.key)
+            elif event.type == pygame.KEYUP:
+                if (
+                    event.key in self.currently_pressed_keys
+                ):  # Technically it should always be, but just in case
+                    self.new_keys_pressed.remove(event.key)
+            elif event.type == pygame.QUIT:
+                self.quit = True
 
-def scale_y(y_coord):
-    return (y_coord / GAME_HEIGHT) * RESOLUTION_HEIGHT
-
-
-def render():
-    global paddle_x, paddle_y, balls
-    screen.fill((0, 0, 0))
-    draw_paddle(
-        scale_x(paddle_x),
-        scale_y(paddle_y),
-        scale_x(PADDLE_WIDTH),
-        scale_y(PADDLE_HEIGHT),
-    )
-    for ball in balls:
-        ball.render()
-    for block in blocks:
-        block.render()
-    pygame.display.update()
+    def get_keys(self):
+        return self.currently_pressed_keys.extend(self.new_keys_pressed)
 
 
 def update(delta_t):
@@ -287,13 +330,6 @@ def handle_input():
                     game_screen = "play"
 
 
-def msg_screen(msg, x, y, color=(255, 255, 255), size=25, font="arial"):
-    surf = pygame.font.SysFont(font, size).render(msg, True, color)
-    trect = surf.get_rect()
-    trect.center = x, y
-    screen.blit(surf, trect)
-
-
 def restart():
     global game_screen, paddle_x, balls, paddle_x_vel, blocks, last_movement_key_pressed
     balls = [Ball(GAME_WIDTH / 2, paddle_y - 20)]
@@ -321,7 +357,7 @@ def restart():
     game_screen = "play"
 
 
-def GameLoop():
+def OldGameLoop():
     global game_screen
     clock = pygame.time.clock()
 
@@ -417,9 +453,11 @@ def GameLoop():
             clock.tick(fps)
 
 
-game_screen = "menu"
-music_player.load("menu.mp3")
-music_player.play()
+def GameLoop():
+    game_screen = "menu"
+
+    while not game_exit:
+        pass
 
 
 def main():
