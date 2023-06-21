@@ -1,16 +1,7 @@
 import pygame
 import random
 
-
-pygame.init()
-
-clock = pygame.time.Clock()
-fps = 60
-
-RESOLUTION_HEIGHT = 600
-RESOLUTION_WIDTH = 800
 screen = pygame.display.set_mode((RESOLUTION_WIDTH, RESOLUTION_HEIGHT))
-pygame.display.set_caption("Breakout")
 
 GAME_HEIGHT = 600
 GAME_WIDTH = 800
@@ -25,23 +16,69 @@ paddle_x_vel = 0
 
 user_impulse = 0
 user_impulse_per_millisecond = 0.01
-paddle_max_speed_per_millisecond = 1
-air_resistance_coefficient = (
-    user_impulse_per_millisecond / paddle_max_speed_per_millisecond
-)
-
-gravity = 0.0002
 
 last_movement_key_pressed = None
+game_exit = False
 
-game_exit = False  # This should definitely be in the GameLoop but then "global game_exit" doesn't work
 
-start_sound = pygame.mixer.Sound("start effect.mp3")
-hit_sound = pygame.mixer.Sound("paddle hit.mp3")
-block_sound = pygame.mixer.Sound("block hit.mp3")
-win_sound = pygame.mixer.Sound("win sound.wav")
+class Constants:
+    def __init__(self):
+        self.game_width = 800
+        self.game_height = 600
+        self.gravity = 0.0002
+        self.air_resistance_coefficient = 0.01
 
-music_player = pygame.mixer.music
+
+class Settings:
+    def __init__(self):
+        self.fps = 60
+        self.resolution = [800, 600]
+
+
+class Sounds:
+    def __init__(self):
+        self.start_sound = pygame.mixer.Sound("start effect.mp3")
+        self.hit_sound = pygame.mixer.Sound("paddle hit.mp3")
+        self.block_sound = pygame.mixer.Sound("block hit.mp3")
+        self.win_sound = pygame.mixer.Sound("win sound.wav")
+
+
+class Music:
+    def __init__(self):
+        self.menu = "menu.mp3"
+        self.game_over = "game over.mp3"
+        self.game_play = "music.mp3"
+        self.victory = "win music.mp3"
+
+
+class Audio:
+    def __init__(self):
+        self.sounds = Sounds()
+        self.music = Music()
+        self.player = pygame.mixer.music
+        self.player.load(self.music.menu)
+        self.sound_queue = []
+        self.music_instruction = None
+
+    def change_music(self, music):
+        self.player.unload()
+        self.player.load(music)
+        self.player.play()
+
+    def queue_sound(self, sound):
+        self.sound_queue.append(sound)
+
+    def queue_music_change(self, music):
+        self.music_instruction = music
+
+    def run(self):
+        for sound in self.sound_queue:
+            sound.play
+        self.sound_queue = []
+
+        if self.music_instruction != None:
+            self.change_music(self.music_instruction)
+            self.music_instruction = None
 
 
 def draw_paddle(
@@ -66,7 +103,7 @@ class Ball:
         self.color = (255, 255, 255)
 
     def update(self, delta_t):
-        global game_state
+        global game_screen
         self.y_vel += gravity * delta_t
         if self.x_vel > 0.1:
             self.x_vel = 0.1
@@ -85,7 +122,7 @@ class Ball:
             music_player.load("game over.mp3")
             music_player.play()
 
-            game_state = "game over"
+            game_screen = "game over"
 
     def render(
         self,
@@ -93,7 +130,6 @@ class Ball:
         pygame.draw.circle(
             screen, self.color, (scale_x(self.x), scale_y(self.y)), scale_y(self.radius)
         )
-        # print("render got called!")
 
     def paddle_collision(self):
         if self.y >= paddle_y and self.y <= paddle_y + PADDLE_HEIGHT:
@@ -101,15 +137,6 @@ class Ball:
                 self.y_vel *= -1
                 self.x_vel += paddle_x_vel / 20
                 hit_sound.play()
-
-            # if self.x > paddle_x + 3*self.radius and self.x < paddle_x + PADDLE_WIDTH - 3*self.radius:
-            #     self.y_vel *= -1
-            # elif self.x < paddle_x + 3*self.radius and self.x > paddle_x - self.radius:
-            #     self.y_vel *= -1
-            #     self.x_vel += paddle_x_vel/4 if paddle_x_vel < 0 else 0
-            # elif self.x > paddle_x + PADDLE_WIDTH - 3*self.radius and self.x < paddle_x + PADDLE_WIDTH + self.radius:
-            #     self.y_vel *= -1
-            #     self.x_vel += paddle_x_vel/4 if paddle_x_vel > 0 else 0
 
     def wall_collision(self):
         if self.x < self.radius and self.x_vel < 0:
@@ -172,7 +199,7 @@ def scale_y(y_coord):
 
 
 def render():
-    global paddle_x, paddle_y, balls  # Is this a good idea? Or should they be passed into the render function?
+    global paddle_x, paddle_y, balls
     screen.fill((0, 0, 0))
     draw_paddle(
         scale_x(paddle_x),
@@ -212,18 +239,18 @@ def update(delta_t):
 
 
 def handle_input():
-    global game_exit, last_movement_key_pressed, game_state
+    global game_exit, last_movement_key_pressed, game_screen
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             game_exit = True
-        if game_state == "play":
+        if game_screen == "play":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_a:
                     last_movement_key_pressed = "A"
                 if event.key == pygame.K_d:
                     last_movement_key_pressed = "D"
                 if event.key == pygame.K_p:
-                    game_state = "pause"
+                    game_screen = "pause"
                     msg_screen("PAUSED", RESOLUTION_WIDTH / 2, RESOLUTION_HEIGHT / 2)
                     msg_screen(
                         "Press P to unpause",
@@ -235,29 +262,29 @@ def handle_input():
                     last_movement_key_pressed = None
                 if event.key == pygame.K_d and last_movement_key_pressed == "D":
                     last_movement_key_pressed = None
-        elif game_state == "game over" or game_state == "game win":
+        elif game_screen == "game over" or game_screen == "game win":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     restart()
                 if event.key == pygame.K_q:
                     game_exit = True
-        elif game_state == "menu":
+        elif game_screen == "menu":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
                     restart()
                 if event.key == pygame.K_q:
                     game_exit = True
                 if event.key == pygame.K_i:
-                    game_state = "instructions"
-        elif game_state == "instructions":
+                    game_screen = "instructions"
+        elif game_screen == "instructions":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_m:
-                    game_state = "menu"
-        elif game_state == "pause":
+                    game_screen = "menu"
+        elif game_screen == "pause":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
                     clock.tick()
-                    game_state = "play"
+                    game_screen = "play"
 
 
 def msg_screen(msg, x, y, color=(255, 255, 255), size=25, font="arial"):
@@ -268,7 +295,7 @@ def msg_screen(msg, x, y, color=(255, 255, 255), size=25, font="arial"):
 
 
 def restart():
-    global game_state, paddle_x, balls, paddle_x_vel, blocks, last_movement_key_pressed
+    global game_screen, paddle_x, balls, paddle_x_vel, blocks, last_movement_key_pressed
     balls = [Ball(GAME_WIDTH / 2, paddle_y - 20)]
     paddle_x = GAME_WIDTH / 2 - PADDLE_WIDTH / 2
     paddle_x_vel = 0
@@ -291,15 +318,17 @@ def restart():
     music_player.play()
     start_sound.play()
     clock.tick()
-    game_state = "play"
+    game_screen = "play"
 
 
 def GameLoop():
-    global game_state
+    global game_screen
+    clock = pygame.time.clock()
+
     clock.tick()
 
     while not game_exit:
-        while game_state == "instructions" and not game_exit:
+        while game_screen == "instructions" and not game_exit:
             screen.fill((0, 0, 0))
             msg_screen("Instructions: ", RESOLUTION_WIDTH / 2, 0.1 * RESOLUTION_HEIGHT)
             msg_screen(
@@ -326,7 +355,7 @@ def GameLoop():
             pygame.display.update()
             clock.tick(fps)
 
-        while game_state == "menu" and not game_exit:
+        while game_screen == "menu" and not game_exit:
             screen.fill((0, 0, 0))
             msg_screen(
                 "Welcome to Breakout!", RESOLUTION_WIDTH / 2, RESOLUTION_HEIGHT / 2
@@ -342,7 +371,7 @@ def GameLoop():
             pygame.display.update()
             clock.tick(fps)
 
-        while game_state == "game over" and not game_exit:
+        while game_screen == "game over" and not game_exit:
             screen.fill((0, 0, 0))
             msg_screen("GAME OVER", RESOLUTION_WIDTH / 2, RESOLUTION_HEIGHT / 2)
             msg_screen(
@@ -353,7 +382,7 @@ def GameLoop():
             pygame.display.update()
             clock.tick(fps)
 
-        while game_state == "game win" and not game_exit:
+        while game_screen == "game win" and not game_exit:
             screen.fill((0, 0, 0))
             msg_screen("YOU WIN!", RESOLUTION_WIDTH / 2, RESOLUTION_HEIGHT / 2)
             msg_screen(
@@ -364,7 +393,7 @@ def GameLoop():
             pygame.display.update()
             clock.tick(fps)
 
-        while game_state == "play" and not game_exit:
+        while game_screen == "play" and not game_exit:
             render()
             handle_input()
 
@@ -378,20 +407,27 @@ def GameLoop():
                 music_player.unload()
                 music_player.load("win music.mp3")
                 music_player.play()
-                game_state = "game win"
+                game_screen = "game win"
 
             clock.tick(fps)
 
-        while game_state == "pause" and not game_exit:
+        while game_screen == "pause" and not game_exit:
             handle_input()
             pygame.display.update()
             clock.tick(fps)
 
 
-game_state = "menu"
+game_screen = "menu"
 music_player.load("menu.mp3")
 music_player.play()
 
 
-GameLoop()
-pygame.quit()
+def main():
+    pygame.init()
+    pygame.display.set_caption("Breakout")
+    GameLoop()
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    main()
