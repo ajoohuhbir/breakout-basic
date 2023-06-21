@@ -2,7 +2,7 @@ import pygame
 import random
 
 
-pygame.init() # Random comment
+pygame.init() 
 
 clock = pygame.time.Clock()
 fps = 60
@@ -33,6 +33,11 @@ gravity = 0.0002
 last_movement_key_pressed = None
 
 game_exit = False   # This should definitely be in the GameLoop but then "global game_exit" doesn't work
+
+start_sound = pygame.mixer.Sound("start effect.mp3")
+hit_sound = pygame.mixer.Sound("paddle hit.mp3")
+block_sound = pygame.mixer.Sound("block hit.mp3")
+win_sound = pygame.mixer.Sound("win sound.wav")
 
 
 def draw_paddle(paddle_x, paddle_y, paddle_width = PADDLE_WIDTH, paddle_height = PADDLE_HEIGHT, paddle_color = PADDLE_COLOR):
@@ -75,6 +80,7 @@ class Ball:
             if self.x > paddle_x and self.x < paddle_x + PADDLE_WIDTH:
                 self.y_vel *= -1
                 self.x_vel += paddle_x_vel/20
+                hit_sound.play()
             
             # if self.x > paddle_x + 3*self.radius and self.x < paddle_x + PADDLE_WIDTH - 3*self.radius:
             #     self.y_vel *= -1
@@ -98,15 +104,19 @@ class Ball:
             if self.y > block.y + block.height and self.y_vel < 0:
                 self.y_vel *= -1
                 blocks.remove(block)
+                block_sound.play()
             elif self.y < block.y and self.y_vel > 0:
                 self.y_vel *= -1
                 blocks.remove(block)
+                block_sound.play()
             elif self.x > block.x + block.width and self.x_vel < 0:
                 self.x_vel *= -1
                 blocks.remove(block)
+                block_sound.play()
             elif self.x < block.x and self.x_vel > 0:
                 self.x_vel *= -1
                 blocks.remove(block)
+                block_sound.play()
 
 
 class Block:
@@ -169,19 +179,38 @@ def handle_input():
                     last_movement_key_pressed = 'A'
                 if event.key == pygame.K_d:
                     last_movement_key_pressed = 'D'
+                if event.key == pygame.K_p:
+                    game_state = 'pause'
+                    msg_screen("PAUSED", RESOLUTION_WIDTH/2, RESOLUTION_HEIGHT/2)
+                    msg_screen("Press P to unpause", RESOLUTION_WIDTH/2, 0.6*RESOLUTION_HEIGHT)
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_a and last_movement_key_pressed == 'A':
                     last_movement_key_pressed = None
                 if event.key == pygame.K_d and last_movement_key_pressed == 'D':
                     last_movement_key_pressed = None
-        elif game_state == "game over":
-             if event.type == pygame.KEYDOWN:
+        elif game_state == "game over" or game_state == "game win":
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     restart()
-        elif game_state == "game win":
-             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:
+                    game_exit = True
+        elif game_state == "menu":
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
-                    restart()                   
+                    restart()
+                if event.key == pygame.K_q:
+                    game_exit = True
+                if event.key == pygame.K_i:
+                    game_state = "instructions"
+        elif game_state == "instructions":
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:
+                    game_state = "menu"
+        elif game_state == "pause":
+             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
+                    clock.tick()
+                    game_state = 'play'               
 
 def msg_screen(msg, x, y, color = (255,255,255), size = 25, font = "arial"):
     surf = pygame.font.SysFont(font, size).render(msg, True, color)
@@ -199,26 +228,44 @@ def restart():
         for j in range(4):
             blocks.append(Block(100*i + 2, 50*j +2, 95, 45, tuple((random.randint(0, 255) for i in range(3)))))
     last_movement_key_pressed = None
+    start_sound.play()
+    clock.tick()
     game_state = "play"
 
-
-balls = [Ball(GAME_WIDTH/2, paddle_y - 20)]  # this should DEFINITELY not be global
-blocks = []
-for i in range(8):
-    for j in range(4):
-        blocks.append(Block(100*i + 2, 50*j +2, 95, 45, tuple((random.randint(0, 255) for i in range(3)))))
-
-game_state = "play"
+game_state = "menu"
 
 def GameLoop():
 
     global game_state
+    clock.tick()
 
     while not game_exit:
+        while game_state == "instructions" and not game_exit:
+            screen.fill((0,0,0))
+            msg_screen("Instructions: ", RESOLUTION_WIDTH/2, 0.1*RESOLUTION_HEIGHT)
+            msg_screen("Press A and D to move your paddle and P to pause", RESOLUTION_WIDTH/2, 0.3*RESOLUTION_HEIGHT)
+            msg_screen("Hit the ball and try to break all the blocks", RESOLUTION_WIDTH/2, 0.5*RESOLUTION_HEIGHT)
+            msg_screen("If the ball falls, you lose", RESOLUTION_WIDTH/2, 0.7*RESOLUTION_HEIGHT)
+            msg_screen("Press M to return to the Menu", RESOLUTION_WIDTH/2, 0.9*RESOLUTION_HEIGHT)
+            handle_input()
+            pygame.display.update()
+            clock.tick(fps)
+
+        while game_state == "menu" and not game_exit:
+            screen.fill((0,0,0))
+            msg_screen("Welcome to Breakout!", RESOLUTION_WIDTH/2, RESOLUTION_HEIGHT/2)
+            msg_screen("Press R to Start", RESOLUTION_WIDTH/2, 0.6*RESOLUTION_HEIGHT)
+            msg_screen("Press I for instructions", RESOLUTION_WIDTH/2, 0.7*RESOLUTION_HEIGHT)
+            msg_screen("Press Q to Exit", RESOLUTION_WIDTH/2, 0.8*RESOLUTION_HEIGHT)
+            handle_input()
+            pygame.display.update()
+            clock.tick(fps)
+       
         while game_state == "game over" and not game_exit:
             screen.fill((0,0,0))
             msg_screen("GAME OVER", RESOLUTION_WIDTH/2, RESOLUTION_HEIGHT/2)
             msg_screen("Press R to restart", RESOLUTION_WIDTH/2, 0.6*RESOLUTION_HEIGHT)
+            msg_screen("Press Q to Exit", RESOLUTION_WIDTH/2, 0.7*RESOLUTION_HEIGHT)
             handle_input()
             pygame.display.update()
             clock.tick(fps)
@@ -227,22 +274,30 @@ def GameLoop():
             screen.fill((0,0,0))
             msg_screen("YOU WIN!", RESOLUTION_WIDTH/2, RESOLUTION_HEIGHT/2)
             msg_screen("Press R to restart", RESOLUTION_WIDTH/2, 0.6*RESOLUTION_HEIGHT)
+            msg_screen("Press Q to Exit", RESOLUTION_WIDTH/2, 0.7*RESOLUTION_HEIGHT)
             handle_input()
             pygame.display.update()
             clock.tick(fps)        
 
-        render()
-        handle_input()
+        while game_state == 'play' and not game_exit:
+            render()
+            handle_input()
 
-        total_delta_t = clock.get_time()
-        N = 50
-        for i in range(N):
-            update(total_delta_t/N)
-        
-        if len(blocks) == 0:
-            game_state = "game win"
-        
-        clock.tick(fps)
+            total_delta_t = clock.get_time()
+            N = 50
+            for i in range(N):
+                update(total_delta_t/N)
+            
+            if len(blocks) == 0:
+                win_sound.play()
+                game_state = "game win"
+            
+            clock.tick(fps)
+
+        while game_state == "pause" and not game_exit:
+            handle_input()
+            pygame.display.update()
+            clock.tick(fps)   
 
 
 
