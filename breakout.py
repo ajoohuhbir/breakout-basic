@@ -10,6 +10,7 @@ class Constants:
         self.gravity = 0.0002
         self.air_resistance_coefficient = 0.01
         self.user_impulse_per_millisecond = 0.01
+        self.update_repetitions = 50
 
 
 class Settings:
@@ -323,17 +324,16 @@ class GameState:
                 )
         return blocks
 
-    def update(self, delta_t, keys):
+    def update(self, delta_t, keys, update_reps):
         audio_instructions = AudioInstructions()
         graphics_instructions = GraphicsInstructions()
 
-        self.manage_screens(keys, audio_instructions, graphics_instructions)
-        if self.game_screen == "play" or self.game_screen == "pause":
-            if self.game_screen == "play":
-                self.update_game(delta_t, keys, audio_instructions)
-            self.game_objects_to_render(graphics_instructions)
-
-        # Note: Win and lose checks in manage_screen_transitions
+        for i in range(update_reps):
+            self.manage_screens(keys, audio_instructions, graphics_instructions)
+            if self.game_screen == "play" or self.game_screen == "pause":
+                if self.game_screen == "play":
+                    self.update_game(delta_t, keys, audio_instructions)
+                self.game_objects_to_render(graphics_instructions)
 
         return audio_instructions, graphics_instructions
 
@@ -486,16 +486,10 @@ def GameLoop():
         total_delta_t = clock.get_time()
         keys = input_handler.get_keys()
 
-        # N = 50
-        # delta_t = total_delta_t / N
-        # for i in range(N - 1):
-        #     game.update(delta_t, keys)
-        #
-        # audio_instructions, graphics_instructions = game.update(total_delta_t, keys)
+        audio_instructions, graphics_instructions = game.update(
+            total_delta_t, keys, game.constants.update_repetitions
+        )
 
-        # For some reason, doing the above completely kills the fps
-
-        audio_instructions, graphics_instructions = game.update(total_delta_t, keys)
         game.check_quit(input_handler.quit)
 
         audio.run(audio_instructions)
