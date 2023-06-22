@@ -209,17 +209,18 @@ class KeyboardState:
         return self.currently_pressed_keys + self.new_keys_pressed
 
 
-class GameScreen(Enum):
+class GameFsmState(Enum):
     MENU = "menu"
     PLAY = "play"
     PAUSE = "pause"
     GAME_WIN = "game win"
     GAME_OVER = "game over"
+    QUIT = "quit"
 
 
 class GameState:
     def __init__(self):
-        self.game_screen = GameScreen.MENU
+        self.game_fsm_state = GameFsmState.MENU
         self.game_exit = False
         self.settings = Settings()
 
@@ -229,11 +230,21 @@ class GameState:
         audio_instructions = AudioInstructions()
         keys = keyboard_state.get_keys()
 
-        self.__manage_screens(keyboard_state, audio_instructions)
-        if self.game_screen == GameScreen.PLAY or self.game_screen == GameScreen.PLAY:
-            if self.game_screen == GameScreen.PLAY:
+        next_fsm_state = self.__next_fsm_state(keyboard_state)
+
+        if next_fsm_state != None:
+            state_transition_audio(
+                self.game_fsm_state, next_fsm_state, audio_instructions
+            )
+            self.__on_transition(next_fsm_state)
+
+        if (
+            self.game_fsm_state == GameFsmState.PLAY
+            or self.game_fsm_state == GameFsmState.PAUSE
+        ):
+            if self.game_fsm_state == GameFsmState.PLAY:
                 delta_t = total_delta_t / update_reps
-                for i in range(update_reps):
+                for _ in range(update_reps):
                     self.__update_game(delta_t, keys, audio_instructions)
             objects = self.__game_objects_to_render()
         else:
@@ -243,7 +254,7 @@ class GameState:
             self.game_exit = True
 
         return audio_instructions, GraphicsInstructions(
-            objects, screen_content(self.game_screen)
+            objects, screen_content(self.game_fsm_state)
         )
 
     def __initialize_game(self):
@@ -267,7 +278,6 @@ class GameState:
             )
         ]
         self.blocks = self.__generate_blocks()
-        self.game_screen = GameScreen.PLAY
 
     def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
         if (
@@ -366,63 +376,67 @@ class GameState:
     def __game_objects_to_render(self) -> list[GameObject]:
         return [self.paddle] + self.balls + self.blocks
 
-    def __next_screen(self, keyboard_state: KeyboardState) -> GameScreen | None:
-        pass
-
-    def __manage_screens(
-        self,
-        keyboard_state: KeyboardState,
-        audio_instructions: AudioInstructions,
-    ):
+    def __next_fsm_state(self, keyboard_state: KeyboardState) -> GameFsmState | None:
         keys = keyboard_state.get_keys()
+        if pygame.K_q in keys and self.game_fsm_state in [
+            GameFsmState.MENU,
+            GameFsmState.GAME_OVER,
+            GameFsmState.GAME_WIN,
+        ]:
+            return GameFsmState.QUIT
+        elif pygame.K_r in keys and self.game_fsm_state in [
+            GameFsmState.GAME_OVER,
+            GameFsmState.GAME_WIN,
+        ]:
+            return GameFsmState.PLAY
+        elif pygame.K_p in keyboard_state.new_keys_pressed:
+            if self.game_fsm_state == GameFsmState.MENU:
+                return GameFsmState.PLAY
+            elif self.game_fsm_state == GameFsmState.PLAY:
+                return GameFsmState.PAUSE
+            elif self.game_fsm_state == GameFsmState.PAUSE:
+                return GameFsmState.PLAY
 
-        if self.game_screen == GameScreen.PLAY:
-            if pygame.K_p in keyboard_state.new_keys_pressed:
-                self.game_screen = GameScreen.PAUSE
+        if self.game_fsm_state == GameFsmState.PLAY:
             if len(self.balls) == 0:
-                self.game_screen = GameScreen.GAME_OVER
-            if len(self.blocks) == 0:
-                self.game_screen = GameScreen.GAME_WIN
+                return GameFsmState.GAME_OVER
+            elif len(self.blocks) == 0:
+                return GameFsmState.GAME_WIN
 
-        elif self.game_screen == GameScreen.PAUSE:
-            if pygame.K_p in keyboard_state.new_keys_pressed:
-                self.game_screen = GameScreen.PLAY
-
-        elif (
-            self.game_screen == GameScreen.GAME_WIN
-            or self.game_screen == GameScreen.GAME_OVER
+    def __on_transition(self, next_state: GameFsmState):
+        if (
+            next_state == GameFsmState.PLAY
+            and self.game_fsm_state != GameFsmState.PAUSE
         ):
-            if pygame.K_r in keys:
-                self.__initialize_game()
-            if pygame.K_q in keys:
-                self.game_exit = True
-            if self.game_screen == GameScreen.GAME_OVER:
-                pass
-        elif self.game_screen == GameScreen.MENU:
-            if pygame.K_p in keys:
-                self.__initialize_game()
-            if pygame.K_q in keys:
-                self.game_exit = True
+            self.__initialize_game()
+        if next_state == GameFsmState.QUIT:
+            self.game_exit = True
+
+        self.game_fsm_state = next_state
 
 
-def screen_transitioin_audio(
-    current_screen: GameScreen,
-    target_screen: GameScreen,
+def state_transition_audio(
+    current_state: GameFsmState,
+    target_state: GameFsmState,
     audio_instructions: AudioInstructions,
 ):
-    if target_screen == GameScreen.GAME_WIN:
+    if target_state == GameFsmState.GAME_WIN:
         audio_instructions.queue_sound(SoundReprs.WIN_SOUND)
         audio_instructions.queue_music_change(Music.VICTORY)
-    elif target_screen == GameScreen.GAME_OVER:
+    elif target_state == GameFsmState.GAME_OVER:
         audio_instructions.queue_music_change(Music.GAME_OVER)
-    elif target_screen == GameScreen.PLAY:
-        if current_screen in [GameScreen.GAME_OVER, GameScreen.GAME_WIN]:
+    elif target_state == GameFsmState.PLAY:
+        if current_state in [
+            GameFsmState.GAME_OVER,
+            GameFsmState.GAME_WIN,
+            GameFsmState.MENU,
+        ]:
             audio_instructions.queue_music_change(Music.GAME_PLAY)
 
 
-def screen_content(game_screen: GameScreen) -> list[Message]:
+def screen_content(game_fsm_state: GameFsmState) -> list[Message]:
     answer = []
-    if game_screen == GameScreen.MENU:
+    if game_fsm_state == GameFsmState.MENU:
         answer.append(
             Message(
                 "Welcome to Breakout!",
@@ -447,7 +461,7 @@ def screen_content(game_screen: GameScreen) -> list[Message]:
                 0.8 * Constants.game_height,
             )
         )
-    elif game_screen == GameScreen.PAUSE:
+    elif game_fsm_state == GameFsmState.PAUSE:
         answer.append(
             Message(
                 "PAUSED",
@@ -464,7 +478,7 @@ def screen_content(game_screen: GameScreen) -> list[Message]:
                 0.75 * Constants.game_height,
             )
         )
-    elif game_screen == GameScreen.GAME_OVER:
+    elif game_fsm_state == GameFsmState.GAME_OVER:
         answer.append(
             Message(
                 "GAME OVER",
@@ -489,7 +503,7 @@ def screen_content(game_screen: GameScreen) -> list[Message]:
                 0.8 * Constants.game_height,
             )
         )
-    elif game_screen == GameScreen.GAME_WIN:
+    elif game_fsm_state == GameFsmState.GAME_WIN:
         answer.append(
             Message(
                 "YOU WIN",
