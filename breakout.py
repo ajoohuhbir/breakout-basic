@@ -76,7 +76,7 @@ class Audio:
         self.player.load(self.to_music[Music.MENU])
         self.player.play()
 
-    def __change_music(self, music):
+    def __change_music(self, music: str):
         self.player.unload()
         self.player.load(music)
         self.player.play()
@@ -136,7 +136,7 @@ class GraphicsInstructions:
 
 
 class Graphics:  # Does not yet support different resolutions
-    def __init__(self, resolution_width, resolution_height):
+    def __init__(self, resolution_width: int, resolution_height: int):
         self.screen = pygame.display.set_mode((resolution_width, resolution_height))
         self.paddle_color = (255, 255, 255)
         self.ball_color = (255, 255, 255)
@@ -158,7 +158,7 @@ class Graphics:  # Does not yet support different resolutions
     def render_ball(self, ball: Ball):
         pygame.draw.circle(self.screen, self.ball_color, (ball.x, ball.y), ball.radius)
 
-    def render_object(self, obj):
+    def render_object(self, obj: GameObject):
         if type(obj) == Block:
             self.render_block(obj)
         elif type(obj) == Ball:
@@ -184,13 +184,13 @@ class Graphics:  # Does not yet support different resolutions
         pygame.display.update()
 
 
-class InputHandler:
+class KeyboardState:
     def __init__(self):
         self.new_keys_pressed = []
         self.currently_pressed_keys = []
         self.quit = False
 
-    def handle_input(self):
+    def handle_pygame_events(self):
         self.currently_pressed_keys.extend(self.new_keys_pressed)
         self.new_keys_pressed = []
 
@@ -217,7 +217,28 @@ class GameState:
         self.settings = Settings()
         self.constants = Constants()
 
-    def initialize_game(self):
+    def update(
+        self, total_delta_t: float, keyboard_state: KeyboardState, update_reps: int
+    ) -> Tuple[AudioInstructions, GraphicsInstructions]:
+        audio_instructions = AudioInstructions()
+        keys = keyboard_state.get_keys()
+
+        messages = self.__manage_screens(keyboard_state, audio_instructions)
+        if self.game_screen == "play" or self.game_screen == "pause":
+            if self.game_screen == "play":
+                delta_t = total_delta_t / update_reps
+                for i in range(update_reps):
+                    self.__update_game(delta_t, keys, audio_instructions)
+            objects = self.__game_objects_to_render()
+        else:
+            objects = []
+
+        if keyboard_state.quit:
+            self.game_exit = True
+
+        return audio_instructions, GraphicsInstructions(objects, messages)
+
+    def __initialize_game(self):
         self.paddle = Paddle(
             self.constants.game_width / 2 - 50,
             0.9 * self.constants.game_height,
@@ -237,10 +258,10 @@ class GameState:
                 self.constants.ball_radius,
             )
         ]
-        self.blocks = self.generate_blocks()
+        self.blocks = self.__generate_blocks()
         self.game_screen = "play"
 
-    def collision_check_ball_block(self, ball: Ball, block: Block):
+    def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
         if (
             block.x - ball.radius < ball.x < block.x + block.width + ball.radius
             and block.y - ball.radius < ball.y < block.y + block.height + ball.radius
@@ -259,7 +280,7 @@ class GameState:
                 self.blocks.remove(block)
             return True  # This should flag the block sound to be played
 
-    def collision_check_ball_wall(self, ball: Ball):
+    def __collision_check_ball_wall(self, ball: Ball):
         if ball.x < ball.radius and ball.x_vel < 0:
             ball.x_vel *= -1
         elif ball.x > self.constants.game_width - ball.radius and ball.x_vel > 0:
@@ -267,14 +288,16 @@ class GameState:
         if ball.y < ball.radius and ball.y_vel < 0:
             ball.y_vel *= -1
 
-    def collision_check_ball_paddle(self, ball: Ball, paddle: Paddle):
+    def __collision_check_ball_paddle(self, ball: Ball, paddle: Paddle) -> bool:
         if ball.y >= paddle.y and ball.y <= paddle.y + paddle.height:
             if ball.x > paddle.x and ball.x < paddle.x + paddle.width:
                 ball.y_vel *= -1
                 ball.x_vel += paddle.x_vel / 20
                 return True  # This should flag the paddle sound to be played
 
-    def update_ball(self, ball: Ball, delta_t, audio_instructions: AudioInstructions):
+    def __update_ball(
+        self, ball: Ball, delta_t: float, audio_instructions: AudioInstructions
+    ):
         ball.y_vel += self.constants.gravity * delta_t
         if ball.x_vel > 0.1:
             ball.x_vel = 0.1
@@ -286,14 +309,16 @@ class GameState:
 
         ball.y += ball.y_vel
         ball.x += ball.x_vel
-        if self.collision_check_ball_paddle(ball, self.paddle):
+        if self.__collision_check_ball_paddle(ball, self.paddle):
             audio_instructions.queue_sound(SoundReprs.HIT_SOUND)
-        self.collision_check_ball_wall(ball)
+        self.__collision_check_ball_wall(ball)
         for block in self.blocks:
-            if self.collision_check_ball_block(ball, block):
+            if self.__collision_check_ball_block(ball, block):
                 audio_instructions.queue_sound(SoundReprs.BLOCK_SOUND)
 
-    def update_game(self, delta_t, keys, audio_instructions: AudioInstructions):
+    def __update_game(
+        self, delta_t: float, keys: list[int], audio_instructions: AudioInstructions
+    ):
         if pygame.K_a in keys:
             impulse_sign = -1
         elif pygame.K_d in keys:
@@ -313,9 +338,9 @@ class GameState:
             self.paddle.x = 0
 
         for ball in self.balls:
-            self.update_ball(ball, delta_t, audio_instructions)
+            self.__update_ball(ball, delta_t, audio_instructions)
 
-    def generate_blocks(self):
+    def __generate_blocks(self) -> list[Block]:
         blocks = []
         for i in range(8):
             for j in range(4):
@@ -330,35 +355,19 @@ class GameState:
                 )
         return blocks
 
-    def update(self, total_delta_t, input_handler: InputHandler, update_reps):
-        audio_instructions = AudioInstructions()
-        keys = input_handler.get_keys()
-
-        messages = self.manage_screens(input_handler, audio_instructions)
-        if self.game_screen == "play" or self.game_screen == "pause":
-            if self.game_screen == "play":
-                delta_t = total_delta_t / update_reps
-                for i in range(update_reps):
-                    self.update_game(delta_t, keys, audio_instructions)
-            objects = self.game_objects_to_render()
-        else:
-            objects = []
-
-        return audio_instructions, GraphicsInstructions(objects, messages)
-
-    def game_objects_to_render(self) -> list[GameObject]:
+    def __game_objects_to_render(self) -> list[GameObject]:
         return [self.paddle] + self.balls + self.blocks
 
-    def manage_screens(
+    def __manage_screens(
         self,
-        input_handler: InputHandler,
+        keyboard_state: KeyboardState,
         audio_instructions: AudioInstructions,
     ) -> list[Message]:
-        keys = input_handler.get_keys()
+        keys = keyboard_state.get_keys()
         answer = []
 
         if self.game_screen == "play":
-            if pygame.K_p in input_handler.new_keys_pressed:
+            if pygame.K_p in keyboard_state.new_keys_pressed:
                 self.game_screen = "pause"
             if len(self.balls) == 0:
                 self.game_screen = "game over"
@@ -369,7 +378,7 @@ class GameState:
                 audio_instructions.queue_music_change(Music.VICTORY)
 
         elif self.game_screen == "pause":
-            if pygame.K_p in input_handler.new_keys_pressed:
+            if pygame.K_p in keyboard_state.new_keys_pressed:
                 self.game_screen = "play"
             answer.append(
                 Message(
@@ -391,7 +400,7 @@ class GameState:
         elif self.game_screen == "game win" or self.game_screen == "game over":
             if pygame.K_r in keys:
                 audio_instructions.queue_music_change(Music.GAME_PLAY)
-                self.initialize_game()
+                self.__initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
             if self.game_screen == "game over":
@@ -447,7 +456,7 @@ class GameState:
         elif self.game_screen == "menu":
             if pygame.K_p in keys:
                 audio_instructions.queue_music_change(Music.GAME_PLAY)
-                self.initialize_game()
+                self.__initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
             answer.append(
@@ -476,17 +485,13 @@ class GameState:
             )
         return answer
 
-    def check_quit(self, quit):
-        if quit:
-            self.game_exit = True
-
 
 def GameLoop():
     game = GameState()
     clock = pygame.time.Clock()
     audio = Audio()
     graphics = Graphics(game.settings.resolution_width, game.settings.resolution_height)
-    input_handler = InputHandler()
+    keyboard_state = KeyboardState()
 
     while not game.game_exit:
         clock.tick(game.settings.fps)
@@ -494,16 +499,13 @@ def GameLoop():
         total_delta_t = clock.get_time()
 
         audio_instructions, graphics_instructions = game.update(
-            total_delta_t, input_handler, game.constants.update_repetitions
+            total_delta_t, keyboard_state, game.constants.update_repetitions
         )
-
-        game.check_quit(input_handler.quit)
 
         audio.run(audio_instructions)
         graphics.render(graphics_instructions)
 
-        input_handler.handle_input()
-        # print(total_delta_t)
+        keyboard_state.handle_pygame_events()
 
 
 def main():
