@@ -8,17 +8,16 @@ Color = Tuple[float, float, float]
 
 
 class Constants:
-    def __init__(self):
-        self.game_width = 800
-        self.game_height = 600
-        self.gravity = 0.0002
-        self.air_resistance_coefficient = 0.01
-        self.user_impulse_per_millisecond = 0.01
-        self.update_repetitions = 50
-        self.init_y_vel_ball = -0.28
-        self.init_max_x_vel_ball = 0.05
-        self.max_x_vel_ball = 0.1
-        self.ball_radius = 5
+    game_width = 800
+    game_height = 600
+    gravity = 0.0002
+    air_resistance_coefficient = 0.01
+    user_impulse_per_millisecond = 0.01
+    update_repetitions = 50
+    init_y_vel_ball = -0.28
+    init_max_x_vel_ball = 0.05
+    max_x_vel_ball = 0.1
+    ball_radius = 5
 
 
 class Settings:
@@ -210,12 +209,19 @@ class KeyboardState:
         return self.currently_pressed_keys + self.new_keys_pressed
 
 
+class GameScreen(Enum):
+    MENU = "menu"
+    PLAY = "play"
+    PAUSE = "pause"
+    GAME_WIN = "game win"
+    GAME_OVER = "game over"
+
+
 class GameState:
     def __init__(self):
-        self.game_screen = "menu"
+        self.game_screen = GameScreen.MENU
         self.game_exit = False
         self.settings = Settings()
-        self.constants = Constants()
 
     def update(
         self, total_delta_t: float, keyboard_state: KeyboardState, update_reps: int
@@ -224,8 +230,8 @@ class GameState:
         keys = keyboard_state.get_keys()
 
         messages = self.__manage_screens(keyboard_state, audio_instructions)
-        if self.game_screen == "play" or self.game_screen == "pause":
-            if self.game_screen == "play":
+        if self.game_screen == GameScreen.PLAY or self.game_screen == GameScreen.PLAY:
+            if self.game_screen == GameScreen.PLAY:
                 delta_t = total_delta_t / update_reps
                 for i in range(update_reps):
                     self.__update_game(delta_t, keys, audio_instructions)
@@ -240,26 +246,26 @@ class GameState:
 
     def __initialize_game(self):
         self.paddle = Paddle(
-            self.constants.game_width / 2 - 50,
-            0.9 * self.constants.game_height,
+            Constants.game_width / 2 - 50,
+            0.9 * Constants.game_height,
             100,
             10,
             0,
         )
         self.balls = [
             Ball(
-                self.constants.game_width / 2,
+                Constants.game_width / 2,
                 self.paddle.y - 50,
                 random.uniform(
-                    -1 * self.constants.init_max_x_vel_ball,
-                    self.constants.init_max_x_vel_ball,
+                    -1 * Constants.init_max_x_vel_ball,
+                    Constants.init_max_x_vel_ball,
                 ),
-                self.constants.init_y_vel_ball,
-                self.constants.ball_radius,
+                Constants.init_y_vel_ball,
+                Constants.ball_radius,
             )
         ]
         self.blocks = self.__generate_blocks()
-        self.game_screen = "play"
+        self.game_screen = GameScreen.PLAY
 
     def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
         if (
@@ -283,7 +289,7 @@ class GameState:
     def __collision_check_ball_wall(self, ball: Ball):
         if ball.x < ball.radius and ball.x_vel < 0:
             ball.x_vel *= -1
-        elif ball.x > self.constants.game_width - ball.radius and ball.x_vel > 0:
+        elif ball.x > Constants.game_width - ball.radius and ball.x_vel > 0:
             ball.x_vel *= -1
         if ball.y < ball.radius and ball.y_vel < 0:
             ball.y_vel *= -1
@@ -298,13 +304,13 @@ class GameState:
     def __update_ball(
         self, ball: Ball, delta_t: float, audio_instructions: AudioInstructions
     ):
-        ball.y_vel += self.constants.gravity * delta_t
+        ball.y_vel += Constants.gravity * delta_t
         if ball.x_vel > 0.1:
             ball.x_vel = 0.1
         elif ball.x_vel < -0.1:
             ball.x_vel = -0.1
 
-        if ball.y > self.constants.game_height + ball.radius:
+        if ball.y > Constants.game_height + ball.radius:
             self.balls.remove(ball)
 
         ball.y += ball.y_vel
@@ -327,13 +333,13 @@ class GameState:
             impulse_sign = 0
 
         self.paddle.x_vel += delta_t * (
-            impulse_sign * self.constants.user_impulse_per_millisecond
-            - self.constants.air_resistance_coefficient * self.paddle.x_vel
+            impulse_sign * Constants.user_impulse_per_millisecond
+            - Constants.air_resistance_coefficient * self.paddle.x_vel
         )
         self.paddle.x += delta_t * self.paddle.x_vel
 
-        if self.paddle.x > self.constants.game_width - self.paddle.width:
-            self.paddle.x = self.constants.game_width - self.paddle.width
+        if self.paddle.x > Constants.game_width - self.paddle.width:
+            self.paddle.x = Constants.game_width - self.paddle.width
         elif self.paddle.x < 0:
             self.paddle.x = 0
 
@@ -366,124 +372,135 @@ class GameState:
         keys = keyboard_state.get_keys()
         answer = []
 
-        if self.game_screen == "play":
+        if self.game_screen == GameScreen.PLAY:
             if pygame.K_p in keyboard_state.new_keys_pressed:
-                self.game_screen = "pause"
+                self.game_screen = GameScreen.PAUSE
             if len(self.balls) == 0:
-                self.game_screen = "game over"
+                self.game_screen = GameScreen.GAME_OVER
                 audio_instructions.queue_music_change(Music.GAME_OVER)
             if len(self.blocks) == 0:
-                self.game_screen = "game win"
+                self.game_screen = GameScreen.GAME_WIN
                 audio_instructions.queue_sound(SoundReprs.WIN_SOUND)
                 audio_instructions.queue_music_change(Music.VICTORY)
 
-        elif self.game_screen == "pause":
+        elif self.game_screen == GameScreen.PAUSE:
             if pygame.K_p in keyboard_state.new_keys_pressed:
-                self.game_screen = "play"
-            answer.append(
-                Message(
-                    "PAUSED",
-                    50,
-                    self.constants.game_width / 2,
-                    self.constants.game_height / 2,
-                )
-            )
-            answer.append(
-                Message(
-                    "Press P to continue",
-                    25,
-                    self.constants.game_width / 2,
-                    0.75 * self.constants.game_height,
-                )
-            )
+                self.game_screen = GameScreen.PLAY
 
-        elif self.game_screen == "game win" or self.game_screen == "game over":
+        elif (
+            self.game_screen == GameScreen.GAME_WIN
+            or self.game_screen == GameScreen.GAME_OVER
+        ):
             if pygame.K_r in keys:
                 audio_instructions.queue_music_change(Music.GAME_PLAY)
                 self.__initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
-            if self.game_screen == "game over":
-                answer.append(
-                    Message(
-                        "GAME OVER",
-                        50,
-                        self.constants.game_width / 2,
-                        self.constants.game_height / 2,
-                    )
-                )
-                answer.append(
-                    Message(
-                        "Press R to restart",
-                        25,
-                        self.constants.game_width / 2,
-                        0.7 * self.constants.game_height,
-                    )
-                )
-                answer.append(
-                    Message(
-                        "Press Q to quit",
-                        25,
-                        self.constants.game_width / 2,
-                        0.8 * self.constants.game_height,
-                    )
-                )
-            else:
-                answer.append(
-                    Message(
-                        "YOU WIN",
-                        50,
-                        self.constants.game_width / 2,
-                        self.constants.game_height / 2,
-                    )
-                )
-                answer.append(
-                    Message(
-                        "Press R to restart",
-                        25,
-                        self.constants.game_width / 2,
-                        0.7 * self.constants.game_height,
-                    )
-                )
-                answer.append(
-                    Message(
-                        "Press Q to quit",
-                        25,
-                        self.constants.game_width / 2,
-                        0.8 * self.constants.game_height,
-                    )
-                )
-        elif self.game_screen == "menu":
+            if self.game_screen == GameScreen.GAME_OVER:
+                pass
+        elif self.game_screen == GameScreen.MENU:
             if pygame.K_p in keys:
                 audio_instructions.queue_music_change(Music.GAME_PLAY)
                 self.__initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
-            answer.append(
-                Message(
-                    "Welcome to Breakout!",
-                    50,
-                    self.constants.game_width / 2,
-                    self.constants.game_height / 2,
-                )
-            )
-            answer.append(
-                Message(
-                    "Press P to play",
-                    25,
-                    self.constants.game_width / 2,
-                    0.7 * self.constants.game_height,
-                )
-            )
-            answer.append(
-                Message(
-                    "Press Q to quit",
-                    25,
-                    self.constants.game_width / 2,
-                    0.8 * self.constants.game_height,
-                )
-            )
         return answer
+
+
+def screen_content(game_screen: GameScreen) -> list[Message]:
+    answer = []
+    if game_screen == GameScreen.MENU:
+        answer.append(
+            Message(
+                "Welcome to Breakout!",
+                50,
+                Constants.game_width / 2,
+                Constants.game_height / 2,
+            )
+        )
+        answer.append(
+            Message(
+                "Press P to play",
+                25,
+                Constants.game_width / 2,
+                0.7 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Press Q to quit",
+                25,
+                Constants.game_width / 2,
+                0.8 * Constants.game_height,
+            )
+        )
+    elif game_screen == GameScreen.PAUSE:
+        answer.append(
+            Message(
+                "PAUSED",
+                50,
+                Constants.game_width / 2,
+                Constants.game_height / 2,
+            )
+        )
+        answer.append(
+            Message(
+                "Press P to continue",
+                25,
+                Constants.game_width / 2,
+                0.75 * Constants.game_height,
+            )
+        )
+    elif game_screen == GameScreen.GAME_OVER:
+        answer.append(
+            Message(
+                "GAME OVER",
+                50,
+                Constants.game_width / 2,
+                Constants.game_height / 2,
+            )
+        )
+        answer.append(
+            Message(
+                "Press R to restart",
+                25,
+                Constants.game_width / 2,
+                0.7 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Press Q to quit",
+                25,
+                Constants.game_width / 2,
+                0.8 * Constants.game_height,
+            )
+        )
+    elif game_screen == GameScreen.GAME_WIN:
+        answer.append(
+            Message(
+                "YOU WIN",
+                50,
+                Constants.game_width / 2,
+                Constants.game_height / 2,
+            )
+        )
+        answer.append(
+            Message(
+                "Press R to restart",
+                25,
+                Constants.game_width / 2,
+                0.7 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Press Q to quit",
+                25,
+                Constants.game_width / 2,
+                0.8 * Constants.game_height,
+            )
+        )
 
 
 def GameLoop():
@@ -499,7 +516,7 @@ def GameLoop():
         total_delta_t = clock.get_time()
 
         audio_instructions, graphics_instructions = game.update(
-            total_delta_t, keyboard_state, game.constants.update_repetitions
+            total_delta_t, keyboard_state, Constants.update_repetitions
         )
 
         audio.run(audio_instructions)
