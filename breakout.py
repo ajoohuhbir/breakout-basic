@@ -2,6 +2,9 @@ import pygame
 import random
 from enum import Enum
 from dataclasses import dataclass
+from typing import Tuple
+
+Color = Tuple[float, float, float]
 
 
 class Constants:
@@ -12,6 +15,10 @@ class Constants:
         self.air_resistance_coefficient = 0.01
         self.user_impulse_per_millisecond = 0.01
         self.update_repetitions = 50
+        self.init_y_vel_ball = -0.28
+        self.init_max_x_vel_ball = 0.05
+        self.max_x_vel_ball = 0.1
+        self.ball_radius = 5
 
 
 class Settings:
@@ -82,51 +89,41 @@ class Audio:
             self.__change_music(self.to_music[instructions.new_music])
 
 
+@dataclass
 class Message:
-    def __init__(
-        self, msg, size, x, y, font="arial", color=(255, 255, 255)
-    ):  # This DOES mean that the game state has to "know" about colors and fonts
-        self.msg = msg
-        self.size = size
-        self.x = x
-        self.y = y
-        self.font = font
-        self.color = color
-
-    def display(self, screen: pygame.Surface):
-        surf = pygame.font.SysFont(self.font, self.size).render(
-            self.msg, True, self.color
-        )
-        trect = surf.get_rect()
-        trect.center = self.x, self.y
-        screen.blit(surf, trect)
+    text: str
+    size: int
+    x: float
+    y: float
+    font: str = "arial"
+    color: Color = (255, 255, 255)
 
 
+@dataclass
 class Paddle:
-    def __init__(self, x, y, width, height):
-        self.x = x
-        self.y = y
-        self.height = height
-        self.width = width
-        self.x_vel = 0
+    x: float
+    y: float
+    width: float
+    height: float
+    x_vel: float
 
 
+@dataclass
 class Ball:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.x_vel = random.uniform(-0.05, 0.05)
-        self.y_vel = -0.28  # This doesn't seem to be the right place to hardcode this
-        self.radius = 5
+    x: float
+    y: float
+    x_vel: float
+    y_vel: float
+    radius: float
 
 
+@dataclass
 class Block:
-    def __init__(self, x, y, width, height, color):
-        self.x = x
-        self.y = y
-        self.height = height
-        self.width = width
-        self.color = color
+    x: float
+    y: float
+    width: float
+    height: float
+    color: Color
 
 
 GameObject = Block | Paddle | Ball
@@ -144,21 +141,21 @@ class Graphics:  # Does not yet support different resolutions
         self.paddle_color = (255, 255, 255)
         self.ball_color = (255, 255, 255)
 
-    def render_paddle(self, paddle):
+    def render_paddle(self, paddle: Paddle):
         pygame.draw.rect(
             self.screen,
             self.paddle_color,
             [paddle.x, paddle.y, paddle.width, paddle.height],
         )
 
-    def render_block(self, block):
+    def render_block(self, block: Block):
         pygame.draw.rect(
             self.screen,
             block.color,
             [block.x, block.y, block.width, block.height],
         )
 
-    def render_ball(self, ball):
+    def render_ball(self, ball: Ball):
         pygame.draw.circle(self.screen, self.ball_color, (ball.x, ball.y), ball.radius)
 
     def render_object(self, obj):
@@ -169,6 +166,12 @@ class Graphics:  # Does not yet support different resolutions
         elif type(obj) == Paddle:
             self.render_paddle(obj)
 
+    def render_message(self, msg: Message):
+        surf = pygame.font.SysFont(msg.font, msg.size).render(msg.text, True, msg.color)
+        trect = surf.get_rect()
+        trect.center = msg.x, msg.y
+        self.screen.blit(surf, trect)
+
     def render(self, instructions: GraphicsInstructions):
         self.screen.fill((0, 0, 0))
 
@@ -176,7 +179,7 @@ class Graphics:  # Does not yet support different resolutions
             self.render_object(obj)
 
         for msg in instructions.messages:
-            msg.display(self.screen)
+            self.render_message(msg)
 
         pygame.display.update()
 
@@ -220,8 +223,20 @@ class GameState:
             0.9 * self.constants.game_height,
             100,
             10,
+            0,
         )
-        self.balls = [Ball(self.constants.game_width / 2, self.paddle.y - 50)]
+        self.balls = [
+            Ball(
+                self.constants.game_width / 2,
+                self.paddle.y - 50,
+                random.uniform(
+                    -1 * self.constants.init_max_x_vel_ball,
+                    self.constants.init_max_x_vel_ball,
+                ),
+                self.constants.init_y_vel_ball,
+                self.constants.ball_radius,
+            )
+        ]
         self.blocks = self.generate_blocks()
         self.game_screen = "play"
 
