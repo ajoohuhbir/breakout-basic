@@ -479,6 +479,8 @@ def GameLoop():
         # delta_t = total_delta_t / N
         # for i in range(N - 1):
         #     game.update(delta_t, keys)
+        #
+        # audio_instructions, graphics_instructions = game.update(total_delta_t, keys)
 
         # For some reason, doing the above completely kills the fps
 
