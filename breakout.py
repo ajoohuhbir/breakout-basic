@@ -43,8 +43,6 @@ class Music(Enum):
 
 class AudioInstructions:
     def __init__(self):
-        self.music = Music()
-        self.sounds = SoundReprs()
         self.sound_queue = []
         self.new_music = None
 
@@ -57,16 +55,21 @@ class AudioInstructions:
 
 class Audio:
     def __init__(self):
-        self.music = Music()
         self.sounds = Sounds()
         self.to_sounds = {
-            "start_sound": self.sounds.start_sound,
-            "hit_sound": self.sounds.hit_sound,
-            "block_sound": self.sounds.block_sound,
-            "win_sound": self.sounds.win_sound,
+            SoundReprs.START_SOUND: self.sounds.start_sound,
+            SoundReprs.HIT_SOUND: self.sounds.hit_sound,
+            SoundReprs.BLOCK_SOUND: self.sounds.block_sound,
+            SoundReprs.WIN_SOUND: self.sounds.win_sound,
+        }
+        self.to_music = {
+            Music.MENU: "menu.mp3",
+            Music.GAME_OVER: "game over.mp3",
+            Music.GAME_PLAY: "music.mp3",
+            Music.VICTORY: "win music.mp3",
         }
         self.player = pygame.mixer.music
-        self.player.load(self.music.MENU)
+        self.player.load(self.to_music[Music.MENU])
         self.player.play()
 
     def change_music(self, music):
@@ -79,7 +82,7 @@ class Audio:
             self.to_sounds[sound_repr].play()
 
         if instructions.new_music != None:
-            self.change_music(instructions.new_music)
+            self.change_music(self.to_music[instructions.new_music])
 
 
 class Message:
@@ -277,11 +280,11 @@ class GameState:
         ball.y += ball.y_vel
         ball.x += ball.x_vel
         if self.collision_check_ball_paddle(ball, self.paddle):
-            audio_instructions.queue_sound(audio_instructions.sounds.HIT_SOUND)
+            audio_instructions.queue_sound(SoundReprs.HIT_SOUND)
         self.collision_check_ball_wall(ball)
         for block in self.blocks:
             if self.collision_check_ball_block(ball, block):
-                audio_instructions.queue_sound(audio_instructions.sounds.BLOCK_SOUND)
+                audio_instructions.queue_sound(SoundReprs.BLOCK_SOUND)
 
     def update_game(self, delta_t, keys, audio_instructions: AudioInstructions):
         if pygame.K_a in keys:
@@ -352,13 +355,11 @@ class GameState:
                 self.game_screen == "pause"
             if len(self.balls) == 0:
                 self.game_screen == "game over"
-                audio_instructions.queue_music_change(
-                    audio_instructions.music.GAME_OVER
-                )
+                audio_instructions.queue_music_change(Music.GAME_OVER)
             if len(self.blocks) == 0:
                 self.game_screen == "game win"
-                audio_instructions.queue_sound(audio_instructions.sounds.WIN_SOUND)
-                audio_instructions.queue_music_change(audio_instructions.music.VICTORY)
+                audio_instructions.queue_sound(SoundReprs.WIN_SOUND)
+                audio_instructions.queue_music_change(Music.VICTORY)
 
         elif self.game_screen == "pause":
             if pygame.K_p in keys:
@@ -382,9 +383,7 @@ class GameState:
 
         elif self.game_screen == "game win" or self.game_screen == "game over":
             if pygame.K_r in keys:
-                audio_instructions.queue_music_change(
-                    audio_instructions.music.GAME_PLAY
-                )
+                audio_instructions.queue_music_change(Music.GAME_PLAY)
                 self.initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
@@ -440,9 +439,7 @@ class GameState:
                 )
         elif self.game_screen == "menu":
             if pygame.K_p in keys:
-                audio_instructions.queue_music_change(
-                    audio_instructions.music.GAME_PLAY
-                )
+                audio_instructions.queue_music_change(Music.GAME_PLAY)
                 self.initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
