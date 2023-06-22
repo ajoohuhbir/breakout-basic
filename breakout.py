@@ -328,12 +328,12 @@ class GameState:
         audio_instructions = AudioInstructions()
         graphics_instructions = GraphicsInstructions()
 
-        for i in range(update_reps):
-            self.manage_screens(keys, audio_instructions, graphics_instructions)
-            if self.game_screen == "play" or self.game_screen == "pause":
-                if self.game_screen == "play":
+        self.manage_screens(keys, audio_instructions, graphics_instructions)
+        if self.game_screen == "play" or self.game_screen == "pause":
+            if self.game_screen == "play":
+                for i in range(update_reps):
                     self.update_game(delta_t, keys, audio_instructions)
-                self.game_objects_to_render(graphics_instructions)
+            self.game_objects_to_render(graphics_instructions)
 
         return audio_instructions, graphics_instructions
 
