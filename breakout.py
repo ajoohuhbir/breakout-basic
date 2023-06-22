@@ -324,11 +324,12 @@ class GameState:
                 )
         return blocks
 
-    def update(self, total_delta_t, keys, new_keys, update_reps):
+    def update(self, total_delta_t, input_handler: InputHandler, update_reps):
         audio_instructions = AudioInstructions()
         graphics_instructions = GraphicsInstructions()
+        keys = input_handler.get_keys()
 
-        self.manage_screens(keys, audio_instructions, graphics_instructions)
+        self.manage_screens(input_handler, audio_instructions, graphics_instructions)
         if self.game_screen == "play" or self.game_screen == "pause":
             if self.game_screen == "play":
                 delta_t = total_delta_t / update_reps
@@ -347,13 +348,14 @@ class GameState:
 
     def manage_screens(
         self,
-        keys,
+        input_handler: InputHandler,
         audio_instructions: AudioInstructions,
         graphics_instructions: GraphicsInstructions,
     ):
+        keys = input_handler.get_keys()
         print(self.game_screen)
         if self.game_screen == "play":
-            if pygame.K_p in keys:
+            if pygame.K_p in input_handler.new_keys_pressed:
                 self.game_screen = "pause"
             if len(self.balls) == 0:
                 self.game_screen = "game over"
@@ -364,7 +366,7 @@ class GameState:
                 audio_instructions.queue_music_change(Music.VICTORY)
 
         elif self.game_screen == "pause":
-            if pygame.K_p in keys:
+            if pygame.K_p in input_handler.new_keys_pressed:
                 self.game_screen = "play"
             graphics_instructions.msg_screen(
                 Message(
@@ -486,7 +488,6 @@ def GameLoop():
         clock.tick(game.settings.fps)
 
         total_delta_t = clock.get_time()
-        keys = input_handler.get_keys()
 
         audio_instructions, graphics_instructions = game.update(
             total_delta_t, input_handler, game.constants.update_repetitions
