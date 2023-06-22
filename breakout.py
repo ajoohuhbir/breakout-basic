@@ -324,13 +324,14 @@ class GameState:
                 )
         return blocks
 
-    def update(self, delta_t, keys, update_reps):
+    def update(self, total_delta_t, keys, new_keys, update_reps):
         audio_instructions = AudioInstructions()
         graphics_instructions = GraphicsInstructions()
 
         self.manage_screens(keys, audio_instructions, graphics_instructions)
         if self.game_screen == "play" or self.game_screen == "pause":
             if self.game_screen == "play":
+                delta_t = total_delta_t / update_reps
                 for i in range(update_reps):
                     self.update_game(delta_t, keys, audio_instructions)
             self.game_objects_to_render(graphics_instructions)
@@ -350,20 +351,21 @@ class GameState:
         audio_instructions: AudioInstructions,
         graphics_instructions: GraphicsInstructions,
     ):
+        print(self.game_screen)
         if self.game_screen == "play":
             if pygame.K_p in keys:
-                self.game_screen == "pause"
+                self.game_screen = "pause"
             if len(self.balls) == 0:
-                self.game_screen == "game over"
+                self.game_screen = "game over"
                 audio_instructions.queue_music_change(Music.GAME_OVER)
             if len(self.blocks) == 0:
-                self.game_screen == "game win"
+                self.game_screen = "game win"
                 audio_instructions.queue_sound(SoundReprs.WIN_SOUND)
                 audio_instructions.queue_music_change(Music.VICTORY)
 
         elif self.game_screen == "pause":
             if pygame.K_p in keys:
-                self.game_screen == "play"
+                self.game_screen = "play"
             graphics_instructions.msg_screen(
                 Message(
                     "PAUSED",
@@ -487,7 +489,7 @@ def GameLoop():
         keys = input_handler.get_keys()
 
         audio_instructions, graphics_instructions = game.update(
-            total_delta_t, keys, game.constants.update_repetitions
+            total_delta_t, input_handler, game.constants.update_repetitions
         )
 
         game.check_quit(input_handler.quit)
@@ -496,7 +498,7 @@ def GameLoop():
         graphics.render(graphics_instructions)
 
         input_handler.handle_input()
-        print(total_delta_t)
+        # print(total_delta_t)
 
 
 def main():
