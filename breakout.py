@@ -229,7 +229,7 @@ class GameState:
         audio_instructions = AudioInstructions()
         keys = keyboard_state.get_keys()
 
-        messages = self.__manage_screens(keyboard_state, audio_instructions)
+        self.__manage_screens(keyboard_state, audio_instructions)
         if self.game_screen == GameScreen.PLAY or self.game_screen == GameScreen.PLAY:
             if self.game_screen == GameScreen.PLAY:
                 delta_t = total_delta_t / update_reps
@@ -242,7 +242,9 @@ class GameState:
         if keyboard_state.quit:
             self.game_exit = True
 
-        return audio_instructions, GraphicsInstructions(objects, messages)
+        return audio_instructions, GraphicsInstructions(
+            objects, screen_content(self.game_screen)
+        )
 
     def __initialize_game(self):
         self.paddle = Paddle(
@@ -364,24 +366,23 @@ class GameState:
     def __game_objects_to_render(self) -> list[GameObject]:
         return [self.paddle] + self.balls + self.blocks
 
+    def __next_screen(self, keyboard_state: KeyboardState) -> GameScreen | None:
+        pass
+
     def __manage_screens(
         self,
         keyboard_state: KeyboardState,
         audio_instructions: AudioInstructions,
-    ) -> list[Message]:
+    ):
         keys = keyboard_state.get_keys()
-        answer = []
 
         if self.game_screen == GameScreen.PLAY:
             if pygame.K_p in keyboard_state.new_keys_pressed:
                 self.game_screen = GameScreen.PAUSE
             if len(self.balls) == 0:
                 self.game_screen = GameScreen.GAME_OVER
-                audio_instructions.queue_music_change(Music.GAME_OVER)
             if len(self.blocks) == 0:
                 self.game_screen = GameScreen.GAME_WIN
-                audio_instructions.queue_sound(SoundReprs.WIN_SOUND)
-                audio_instructions.queue_music_change(Music.VICTORY)
 
         elif self.game_screen == GameScreen.PAUSE:
             if pygame.K_p in keyboard_state.new_keys_pressed:
@@ -392,7 +393,6 @@ class GameState:
             or self.game_screen == GameScreen.GAME_OVER
         ):
             if pygame.K_r in keys:
-                audio_instructions.queue_music_change(Music.GAME_PLAY)
                 self.__initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
@@ -400,11 +400,24 @@ class GameState:
                 pass
         elif self.game_screen == GameScreen.MENU:
             if pygame.K_p in keys:
-                audio_instructions.queue_music_change(Music.GAME_PLAY)
                 self.__initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
-        return answer
+
+
+def screen_transitioin_audio(
+    current_screen: GameScreen,
+    target_screen: GameScreen,
+    audio_instructions: AudioInstructions,
+):
+    if target_screen == GameScreen.GAME_WIN:
+        audio_instructions.queue_sound(SoundReprs.WIN_SOUND)
+        audio_instructions.queue_music_change(Music.VICTORY)
+    elif target_screen == GameScreen.GAME_OVER:
+        audio_instructions.queue_music_change(Music.GAME_OVER)
+    elif target_screen == GameScreen.PLAY:
+        if current_screen in [GameScreen.GAME_OVER, GameScreen.GAME_WIN]:
+            audio_instructions.queue_music_change(Music.GAME_PLAY)
 
 
 def screen_content(game_screen: GameScreen) -> list[Message]:
@@ -501,6 +514,7 @@ def screen_content(game_screen: GameScreen) -> list[Message]:
                 0.8 * Constants.game_height,
             )
         )
+    return answer
 
 
 def GameLoop():
