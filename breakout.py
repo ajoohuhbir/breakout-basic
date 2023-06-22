@@ -1,6 +1,7 @@
 import pygame
 import random
 from enum import Enum
+from dataclasses import dataclass
 
 
 class Constants:
@@ -18,14 +19,6 @@ class Settings:
         self.fps = 60
         self.resolution_width = 800
         self.resolution_height = 600
-
-
-class Sounds:
-    def __init__(self):
-        self.start_sound = pygame.mixer.Sound("start effect.mp3")
-        self.hit_sound = pygame.mixer.Sound("paddle hit.mp3")
-        self.block_sound = pygame.mixer.Sound("block hit.mp3")
-        self.win_sound = pygame.mixer.Sound("win sound.wav")
 
 
 class SoundReprs(Enum):
@@ -56,12 +49,15 @@ class AudioInstructions:
 
 class Audio:
     def __init__(self):
-        self.sounds = Sounds()
+        self.start_sound = pygame.mixer.Sound("start effect.mp3")
+        self.hit_sound = pygame.mixer.Sound("paddle hit.mp3")
+        self.block_sound = pygame.mixer.Sound("block hit.mp3")
+        self.win_sound = pygame.mixer.Sound("win sound.wav")
         self.to_sounds = {
-            SoundReprs.START_SOUND: self.sounds.start_sound,
-            SoundReprs.HIT_SOUND: self.sounds.hit_sound,
-            SoundReprs.BLOCK_SOUND: self.sounds.block_sound,
-            SoundReprs.WIN_SOUND: self.sounds.win_sound,
+            SoundReprs.START_SOUND: self.start_sound,
+            SoundReprs.HIT_SOUND: self.hit_sound,
+            SoundReprs.BLOCK_SOUND: self.block_sound,
+            SoundReprs.WIN_SOUND: self.win_sound,
         }
         self.to_music = {
             Music.MENU: "menu.mp3",
@@ -73,7 +69,7 @@ class Audio:
         self.player.load(self.to_music[Music.MENU])
         self.player.play()
 
-    def change_music(self, music):
+    def __change_music(self, music):
         self.player.unload()
         self.player.load(music)
         self.player.play()
@@ -83,7 +79,7 @@ class Audio:
             self.to_sounds[sound_repr].play()
 
         if instructions.new_music != None:
-            self.change_music(self.to_music[instructions.new_music])
+            self.__change_music(self.to_music[instructions.new_music])
 
 
 class Message:
@@ -97,7 +93,7 @@ class Message:
         self.font = font
         self.color = color
 
-    def msg_screen(self, screen):
+    def display(self, screen: pygame.Surface):
         surf = pygame.font.SysFont(self.font, self.size).render(
             self.msg, True, self.color
         )
@@ -106,17 +102,40 @@ class Message:
         screen.blit(surf, trect)
 
 
+class Paddle:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.height = height
+        self.width = width
+        self.x_vel = 0
+
+
+class Ball:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.x_vel = random.uniform(-0.05, 0.05)
+        self.y_vel = -0.28  # This doesn't seem to be the right place to hardcode this
+        self.radius = 5
+
+
+class Block:
+    def __init__(self, x, y, width, height, color):
+        self.x = x
+        self.y = y
+        self.height = height
+        self.width = width
+        self.color = color
+
+
+GameObject = Block | Paddle | Ball
+
+
+@dataclass
 class GraphicsInstructions:
-    def __init__(self):
-        self.objects_to_render = []
-        self.messages_to_display = []
-        self.pause_rendering = False
-
-    def msg_screen(self, msg: Message):
-        self.messages_to_display.append(msg)
-
-    def render_object(self, obj):
-        self.objects_to_render.append(obj)
+    objects: list[GameObject]
+    messages: list[Message]
 
 
 class Graphics:  # Does not yet support different resolutions
@@ -151,43 +170,15 @@ class Graphics:  # Does not yet support different resolutions
             self.render_paddle(obj)
 
     def render(self, instructions: GraphicsInstructions):
-        if not instructions.pause_rendering:
-            self.screen.fill((0, 0, 0))
+        self.screen.fill((0, 0, 0))
 
-        for obj in instructions.objects_to_render:
+        for obj in instructions.objects:
             self.render_object(obj)
 
-        for msg in instructions.messages_to_display:
-            msg.msg_screen(self.screen)
+        for msg in instructions.messages:
+            msg.display(self.screen)
 
         pygame.display.update()
-
-
-class Paddle:
-    def __init__(self, x, y, width, height):
-        self.x = x
-        self.y = y
-        self.height = height
-        self.width = width
-        self.x_vel = 0
-
-
-class Ball:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.x_vel = random.uniform(-0.05, 0.05)
-        self.y_vel = -0.28  # This doesn't seem to be the right place to hardcode this
-        self.radius = 5
-
-
-class Block:
-    def __init__(self, x, y, width, height, color):
-        self.x = x
-        self.y = y
-        self.height = height
-        self.width = width
-        self.color = color
 
 
 class InputHandler:
@@ -326,34 +317,31 @@ class GameState:
 
     def update(self, total_delta_t, input_handler: InputHandler, update_reps):
         audio_instructions = AudioInstructions()
-        graphics_instructions = GraphicsInstructions()
         keys = input_handler.get_keys()
 
-        self.manage_screens(input_handler, audio_instructions, graphics_instructions)
+        messages = self.manage_screens(input_handler, audio_instructions)
         if self.game_screen == "play" or self.game_screen == "pause":
             if self.game_screen == "play":
                 delta_t = total_delta_t / update_reps
                 for i in range(update_reps):
                     self.update_game(delta_t, keys, audio_instructions)
-            self.game_objects_to_render(graphics_instructions)
+            objects = self.game_objects_to_render()
+        else:
+            objects = []
 
-        return audio_instructions, graphics_instructions
+        return audio_instructions, GraphicsInstructions(objects, messages)
 
-    def game_objects_to_render(self, graphics_instructions: GraphicsInstructions):
-        graphics_instructions.render_object(self.paddle)
-        for ball in self.balls:
-            graphics_instructions.render_object(ball)
-        for block in self.blocks:
-            graphics_instructions.render_object(block)
+    def game_objects_to_render(self) -> list[GameObject]:
+        return [self.paddle] + self.balls + self.blocks
 
     def manage_screens(
         self,
         input_handler: InputHandler,
         audio_instructions: AudioInstructions,
-        graphics_instructions: GraphicsInstructions,
-    ):
+    ) -> list[Message]:
         keys = input_handler.get_keys()
-        print(self.game_screen)
+        answer = []
+
         if self.game_screen == "play":
             if pygame.K_p in input_handler.new_keys_pressed:
                 self.game_screen = "pause"
@@ -368,7 +356,7 @@ class GameState:
         elif self.game_screen == "pause":
             if pygame.K_p in input_handler.new_keys_pressed:
                 self.game_screen = "play"
-            graphics_instructions.msg_screen(
+            answer.append(
                 Message(
                     "PAUSED",
                     50,
@@ -376,7 +364,7 @@ class GameState:
                     self.constants.game_height / 2,
                 )
             )
-            graphics_instructions.msg_screen(
+            answer.append(
                 Message(
                     "Press P to continue",
                     25,
@@ -392,7 +380,7 @@ class GameState:
             if pygame.K_q in keys:
                 self.game_exit = True
             if self.game_screen == "game over":
-                graphics_instructions.msg_screen(
+                answer.append(
                     Message(
                         "GAME OVER",
                         50,
@@ -400,7 +388,7 @@ class GameState:
                         self.constants.game_height / 2,
                     )
                 )
-                graphics_instructions.msg_screen(
+                answer.append(
                     Message(
                         "Press R to restart",
                         25,
@@ -408,7 +396,7 @@ class GameState:
                         0.7 * self.constants.game_height,
                     )
                 )
-                graphics_instructions.msg_screen(
+                answer.append(
                     Message(
                         "Press Q to quit",
                         25,
@@ -417,7 +405,7 @@ class GameState:
                     )
                 )
             else:
-                graphics_instructions.msg_screen(
+                answer.append(
                     Message(
                         "YOU WIN",
                         50,
@@ -425,7 +413,7 @@ class GameState:
                         self.constants.game_height / 2,
                     )
                 )
-                graphics_instructions.msg_screen(
+                answer.append(
                     Message(
                         "Press R to restart",
                         25,
@@ -433,7 +421,7 @@ class GameState:
                         0.7 * self.constants.game_height,
                     )
                 )
-                graphics_instructions.msg_screen(
+                answer.append(
                     Message(
                         "Press Q to quit",
                         25,
@@ -447,7 +435,7 @@ class GameState:
                 self.initialize_game()
             if pygame.K_q in keys:
                 self.game_exit = True
-            graphics_instructions.msg_screen(
+            answer.append(
                 Message(
                     "Welcome to Breakout!",
                     50,
@@ -455,7 +443,7 @@ class GameState:
                     self.constants.game_height / 2,
                 )
             )
-            graphics_instructions.msg_screen(
+            answer.append(
                 Message(
                     "Press P to play",
                     25,
@@ -463,7 +451,7 @@ class GameState:
                     0.7 * self.constants.game_height,
                 )
             )
-            graphics_instructions.msg_screen(
+            answer.append(
                 Message(
                     "Press Q to quit",
                     25,
@@ -471,6 +459,7 @@ class GameState:
                     0.8 * self.constants.game_height,
                 )
             )
+        return answer
 
     def check_quit(self, quit):
         if quit:
