@@ -23,7 +23,7 @@ class Constants:
 class Settings:
     fps = 60
     resolution_width = 800
-    resolution_height = 600
+    resolution_height = 800
 
 
 class Sound(Enum):
@@ -138,28 +138,75 @@ class GraphicsInstructions:
 
 
 class Graphics:  # Does not yet support different resolutions
-    def __init__(self, resolution_width: int, resolution_height: int):
-        self.__screen = pygame.display.set_mode((resolution_width, resolution_height))
+    def __init__(self):
+        self.__screen = pygame.display.set_mode(
+            (Settings.resolution_width, Settings.resolution_height)
+        )
         self.__paddle_color = (255, 255, 255)
         self.__ball_color = (255, 255, 255)
+        self.__set_game_screen()
+
+    def render(self, instructions: GraphicsInstructions):
+        self.__screen.fill((0, 0, 0))
+
+        pygame.draw.rect(
+            self.__screen,
+            (15, 15, 15),
+            [
+                self.game_screen_origin_x,
+                self.game_screen_origin_y,
+                self.game_screen_width,
+                self.game_screen_height,
+            ],
+        )
+
+        for obj in instructions.objects:
+            self.__render_object(obj)
+
+        for msg in instructions.messages:
+            self.__render_message(msg)
+
+        pygame.display.update()
+
+    def __reset_resolution(self):
+        self.__screen = pygame.display.set_mode(
+            (Settings.resolution_width, Settings.resolution_height)
+        )
+        self.__set_game_screen()
 
     def __render_paddle(self, paddle: Paddle):
         pygame.draw.rect(
             self.__screen,
-            self.__paddle_color,
-            [paddle.x, paddle.y, paddle.width, paddle.height],
+            (self.__paddle_color),
+            [
+                self.__game_x_to_resolution_x(paddle.x),
+                self.__game_y_to_resolution_y(paddle.y),
+                self.scaling * paddle.width,
+                self.scaling * paddle.height,
+            ],
         )
 
     def __render_block(self, block: Block):
         pygame.draw.rect(
             self.__screen,
             block.color,
-            [block.x, block.y, block.width, block.height],
+            [
+                self.__game_x_to_resolution_x(block.x),
+                self.__game_y_to_resolution_y(block.y),
+                self.scaling * block.width,
+                self.scaling * block.height,
+            ],
         )
 
     def __render_ball(self, ball: Ball):
         pygame.draw.circle(
-            self.__screen, self.__ball_color, (ball.x, ball.y), ball.radius
+            self.__screen,
+            self.__ball_color,
+            (
+                self.__game_x_to_resolution_x(ball.x),
+                self.__game_y_to_resolution_y(ball.y),
+            ),
+            self.scaling * ball.radius,
         )
 
     def __render_object(self, obj: GameObject):
@@ -171,21 +218,53 @@ class Graphics:  # Does not yet support different resolutions
             self.__render_paddle(obj)
 
     def __render_message(self, msg: Message):
-        surf = pygame.font.SysFont(msg.font, msg.size).render(msg.text, True, msg.color)
+        surf = pygame.font.SysFont(msg.font, round(self.scaling * msg.size)).render(
+            msg.text, True, msg.color
+        )
         trect = surf.get_rect()
-        trect.center = msg.x, msg.y
+        trect.center = self.__game_x_to_resolution_x(
+            msg.x
+        ), self.__game_y_to_resolution_y(msg.y)
         self.__screen.blit(surf, trect)
 
-    def render(self, instructions: GraphicsInstructions):
-        self.__screen.fill((0, 0, 0))
+    def __set_game_screen(self):
+        ratio = Constants.game_width / Constants.game_height
+        res_ratio = Settings.resolution_width / Settings.resolution_height
+        if res_ratio < ratio:
+            self.game_screen_width = Settings.resolution_width
+            self.game_screen_height = self.game_screen_width / ratio
+            self.black_bars = "horizontal"
+            self.scaling = self.game_screen_width / Constants.game_width
+        elif res_ratio > ratio:
+            self.game_screen_height = Settings.resolution_height
+            self.game_screen_width = self.game_screen_height * ratio
+            self.black_bars = "vertical"
+            self.scaling = self.game_screen_height / Constants.game_height
+        else:
+            self.game_screen_height = Settings.resolution_height
+            self.game_screen_width = Settings.resolution_width
+            self.black_bars = "none"
+            self.scaling = self.game_screen_height / Constants.game_height
 
-        for obj in instructions.objects:
-            self.__render_object(obj)
+        if self.black_bars == "none":
+            self.game_screen_origin_x = 0
+            self.game_screen_origin_y = 0
+        elif self.black_bars == "horizontal":
+            self.game_screen_origin_x = 0
+            self.game_screen_origin_y = (Settings.resolution_height / 2) - (
+                self.game_screen_height / 2
+            )
+        elif self.black_bars == "vertical":
+            self.game_screen_origin_y = 0
+            self.game_screen_origin_x = (Settings.resolution_width / 2) - (
+                self.game_screen_width / 2
+            )
 
-        for msg in instructions.messages:
-            self.__render_message(msg)
+    def __game_x_to_resolution_x(self, x: float) -> float:
+        return x * self.scaling + self.game_screen_origin_x
 
-        pygame.display.update()
+    def __game_y_to_resolution_y(self, y: float) -> float:
+        return y * self.scaling + self.game_screen_origin_y
 
 
 class KeyboardState:
@@ -656,7 +735,7 @@ def GameLoop():
     game = GameState()
     clock = pygame.time.Clock()
     audio = Audio()
-    graphics = Graphics(Settings.resolution_width, Settings.resolution_height)
+    graphics = Graphics()
     keyboard_state = KeyboardState()
 
     while not game.game_exit:

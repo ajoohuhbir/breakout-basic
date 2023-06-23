@@ -30,7 +30,7 @@ X Flickering pause screen
 QUESTIONS:
 
 Isn't rendering only the changing parts of a screen more "efficient"?
-GameObjects inheritance
+X GameObjects inheritance
 Should I use sets in the input handler? Is that better?
-Ask about "backwards programming"
-One "Data" class can suffice for settings, constants etc. Is this inheritance? Can I just use less classes?
+X Ask about "backwards programming"
+X One "Data" class can suffice for settings, constants etc. Is this inheritance? Can I just use less classes?
