@@ -246,8 +246,30 @@ class CoreGameState:
             )
         ]
         self.blocks = self.__generate_blocks()
+        self.sounds = []
 
-    def update_game(self, delta_t: float, keys: list[int], sounds: list[SoundReprs]):
+    def update_game(self, total_delta_t: float, keys: list[int]):
+        delta_t = total_delta_t / Constants.update_repetitions
+        for _ in range(Constants.update_repetitions):
+            self.__update_game_physics(delta_t, keys)
+
+    def game_objects_to_render(self) -> list[GameObject]:
+        return [self.paddle] + self.balls + self.blocks
+
+    def get_sounds(self):
+        n = len(self.sounds)
+        temp_sounds = [self.sounds.pop() for _ in range(n)]
+        return temp_sounds
+
+    def game_over(self):
+        condition = len(self.balls) == 0
+        return True if condition else False
+
+    def game_win(self):
+        condition = len(self.blocks) == 0
+        return True if condition else False
+
+    def __update_game_physics(self, delta_t: float, keys: list[int]):
         if pygame.K_a in keys:
             impulse_sign = -1
         elif pygame.K_d in keys:
@@ -267,18 +289,7 @@ class CoreGameState:
             self.paddle.x = 0
 
         for ball in self.balls:
-            self.__update_ball(ball, delta_t, sounds)
-
-    def game_objects_to_render(self) -> list[GameObject]:
-        return [self.paddle] + self.balls + self.blocks
-
-    def game_over(self):
-        condition = len(self.balls) == 0
-        return True if condition else False
-
-    def game_win(self):
-        condition = len(self.blocks) == 0
-        return True if condition else False
+            self.__update_ball(ball, delta_t)
 
     def __generate_blocks(self) -> list[Block]:
         blocks = []
@@ -329,7 +340,7 @@ class CoreGameState:
                 ball.x_vel += paddle.x_vel / 20
                 return True  # This should flag the paddle sound to be played
 
-    def __update_ball(self, ball: Ball, delta_t: float, sounds: list[SoundReprs]):
+    def __update_ball(self, ball: Ball, delta_t: float):
         ball.y_vel += Constants.gravity * delta_t
         if ball.x_vel > 0.1:
             ball.x_vel = 0.1
@@ -342,11 +353,11 @@ class CoreGameState:
         ball.y += ball.y_vel
         ball.x += ball.x_vel
         if self.__collision_check_ball_paddle(ball, self.paddle):
-            sounds.append(SoundReprs.HIT_SOUND)
+            self.sounds.append(SoundReprs.HIT_SOUND)
         self.__collision_check_ball_wall(ball)
         for block in self.blocks:
             if self.__collision_check_ball_block(ball, block):
-                sounds.append(SoundReprs.BLOCK_SOUND)
+                self.sounds.append(SoundReprs.BLOCK_SOUND)
 
 
 class GameState:
@@ -356,7 +367,7 @@ class GameState:
         self.settings = Settings()
 
     def update(
-        self, total_delta_t: float, keyboard_state: KeyboardState, update_reps: int
+        self, total_delta_t: float, keyboard_state: KeyboardState
     ) -> Tuple[AudioInstructions, GraphicsInstructions]:
         keys = keyboard_state.get_keys()
 
@@ -376,11 +387,10 @@ class GameState:
             or self.game_fsm_state == GameFsmState.PAUSE
         ):
             if self.game_fsm_state == GameFsmState.PLAY:
-                delta_t = total_delta_t / update_reps
-                sounds = []
-                for _ in range(update_reps):
-                    self.core_game_state.update_game(delta_t, keys, sounds)
-                collision_sounds = AudioInstructions(sounds, None)
+                self.core_game_state.update_game(total_delta_t, keys)
+                collision_sounds = AudioInstructions(
+                    self.core_game_state.get_sounds(), None
+                )
             objects = self.core_game_state.game_objects_to_render()
         else:
             objects = []
@@ -565,7 +575,7 @@ def GameLoop():
         total_delta_t = clock.get_time()
 
         audio_instructions, graphics_instructions = game.update(
-            total_delta_t, keyboard_state, Constants.update_repetitions
+            total_delta_t, keyboard_state
         )
 
         audio.run(audio_instructions)
