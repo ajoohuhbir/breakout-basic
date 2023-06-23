@@ -246,30 +246,29 @@ class CoreGameState:
             )
         ]
         self.blocks = self.__generate_blocks()
-        self.sounds = []
 
-    def update_game(self, total_delta_t: float, keys: list[int]):
+    def update_game(
+        self, total_delta_t: float, keys: list[int]
+    ) -> Tuple[list[SoundReprs], list[GameObject]]:
         delta_t = total_delta_t / Constants.update_repetitions
+        output_sounds = []
+
         for _ in range(Constants.update_repetitions):
-            self.__update_game_physics(delta_t, keys)
+            self.__update_game_physics(delta_t, keys, output_sounds)
 
-    def game_objects_to_render(self) -> list[GameObject]:
-        return [self.paddle] + self.balls + self.blocks
+        return output_sounds, self.__game_objects_to_render()
 
-    def get_sounds(self):
-        n = len(self.sounds)
-        temp_sounds = [self.sounds.pop() for _ in range(n)]
-        return temp_sounds
-
-    def game_over(self):
+    def game_over(self) -> bool:
         condition = len(self.balls) == 0
         return True if condition else False
 
-    def game_win(self):
+    def game_win(self) -> bool:
         condition = len(self.blocks) == 0
         return True if condition else False
 
-    def __update_game_physics(self, delta_t: float, keys: list[int]):
+    def __update_game_physics(
+        self, delta_t: float, keys: list[int], output_sounds: list[SoundReprs]
+    ):
         if pygame.K_a in keys:
             impulse_sign = -1
         elif pygame.K_d in keys:
@@ -289,7 +288,10 @@ class CoreGameState:
             self.paddle.x = 0
 
         for ball in self.balls:
-            self.__update_ball(ball, delta_t)
+            self.__update_ball(ball, delta_t, output_sounds)
+
+    def __game_objects_to_render(self) -> list[GameObject]:
+        return [self.paddle] + self.balls + self.blocks
 
     def __generate_blocks(self) -> list[Block]:
         blocks = []
@@ -340,7 +342,9 @@ class CoreGameState:
                 ball.x_vel += paddle.x_vel / 20
                 return True  # This should flag the paddle sound to be played
 
-    def __update_ball(self, ball: Ball, delta_t: float):
+    def __update_ball(
+        self, ball: Ball, delta_t: float, output_sounds: list[SoundReprs]
+    ):
         ball.y_vel += Constants.gravity * delta_t
         if ball.x_vel > 0.1:
             ball.x_vel = 0.1
@@ -353,11 +357,11 @@ class CoreGameState:
         ball.y += ball.y_vel
         ball.x += ball.x_vel
         if self.__collision_check_ball_paddle(ball, self.paddle):
-            self.sounds.append(SoundReprs.HIT_SOUND)
+            output_sounds.append(SoundReprs.HIT_SOUND)
         self.__collision_check_ball_wall(ball)
         for block in self.blocks:
             if self.__collision_check_ball_block(ball, block):
-                self.sounds.append(SoundReprs.BLOCK_SOUND)
+                output_sounds.append(SoundReprs.BLOCK_SOUND)
 
 
 class GameState:
@@ -387,11 +391,9 @@ class GameState:
             or self.game_fsm_state == GameFsmState.PAUSE
         ):
             if self.game_fsm_state == GameFsmState.PLAY:
-                self.core_game_state.update_game(total_delta_t, keys)
-                collision_sounds = AudioInstructions(
-                    self.core_game_state.get_sounds(), None
-                )
-            objects = self.core_game_state.game_objects_to_render()
+                sounds, objects = self.core_game_state.update_game(total_delta_t, keys)
+
+                collision_sounds = AudioInstructions(sounds, None)
         else:
             objects = []
 
