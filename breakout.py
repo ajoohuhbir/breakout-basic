@@ -41,16 +41,22 @@ class Music(Enum):
     VICTORY = "win music.mp3"
 
 
+@dataclass
 class AudioInstructions:
-    def __init__(self):
-        self.sound_queue = []
-        self.new_music = None
+    sound_queue: list[SoundReprs]
+    new_music: Music
 
-    def queue_sound(self, sound):
-        self.sound_queue.append(sound)
+    def merge(
+        self, other: "AudioInstructions"
+    ) -> "AudioInstructions":  # Annoying underline
+        """This will discard the new_music in the other file in both have new_music"""
+        new_queue = self.sound_queue + other.sound_queue
+        if self.new_music == None:
+            new_music = other.new_music
+        else:
+            new_music = self.new_music
 
-    def queue_music_change(self, music):
-        self.new_music = music
+        return AudioInstructions(new_queue, new_music)
 
 
 class Audio:
@@ -218,46 +224,8 @@ class GameFsmState(Enum):
     QUIT = "quit"
 
 
-class GameState:
+class CoreGameState:
     def __init__(self):
-        self.game_fsm_state = GameFsmState.MENU
-        self.game_exit = False
-        self.settings = Settings()
-
-    def update(
-        self, total_delta_t: float, keyboard_state: KeyboardState, update_reps: int
-    ) -> Tuple[AudioInstructions, GraphicsInstructions]:
-        audio_instructions = AudioInstructions()
-        keys = keyboard_state.get_keys()
-
-        next_fsm_state = self.__next_fsm_state(keyboard_state)
-
-        if next_fsm_state != None:
-            state_transition_audio(
-                self.game_fsm_state, next_fsm_state, audio_instructions
-            )
-            self.__on_transition(next_fsm_state)
-
-        if (
-            self.game_fsm_state == GameFsmState.PLAY
-            or self.game_fsm_state == GameFsmState.PAUSE
-        ):
-            if self.game_fsm_state == GameFsmState.PLAY:
-                delta_t = total_delta_t / update_reps
-                for _ in range(update_reps):
-                    self.__update_game(delta_t, keys, audio_instructions)
-            objects = self.__game_objects_to_render()
-        else:
-            objects = []
-
-        if keyboard_state.quit:
-            self.game_exit = True
-
-        return audio_instructions, GraphicsInstructions(
-            objects, screen_content(self.game_fsm_state)
-        )
-
-    def __initialize_game(self):
         self.paddle = Paddle(
             Constants.game_width / 2 - 50,
             0.9 * Constants.game_height,
@@ -278,6 +246,54 @@ class GameState:
             )
         ]
         self.blocks = self.__generate_blocks()
+
+    def update_game(self, delta_t: float, keys: list[int], sounds: list[SoundReprs]):
+        if pygame.K_a in keys:
+            impulse_sign = -1
+        elif pygame.K_d in keys:
+            impulse_sign = +1
+        else:
+            impulse_sign = 0
+
+        self.paddle.x_vel += delta_t * (
+            impulse_sign * Constants.user_impulse_per_millisecond
+            - Constants.air_resistance_coefficient * self.paddle.x_vel
+        )
+        self.paddle.x += delta_t * self.paddle.x_vel
+
+        if self.paddle.x > Constants.game_width - self.paddle.width:
+            self.paddle.x = Constants.game_width - self.paddle.width
+        elif self.paddle.x < 0:
+            self.paddle.x = 0
+
+        for ball in self.balls:
+            self.__update_ball(ball, delta_t, sounds)
+
+    def game_objects_to_render(self) -> list[GameObject]:
+        return [self.paddle] + self.balls + self.blocks
+
+    def game_over(self):
+        condition = len(self.balls) == 0
+        return True if condition else False
+
+    def game_win(self):
+        condition = len(self.blocks) == 0
+        return True if condition else False
+
+    def __generate_blocks(self) -> list[Block]:
+        blocks = []
+        for i in range(8):
+            for j in range(4):
+                blocks.append(
+                    Block(
+                        100 * i + 2,
+                        50 * j + 2,
+                        95,
+                        45,
+                        tuple((random.randint(0, 255) for i in range(3))),
+                    )
+                )
+        return blocks
 
     def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
         if (
@@ -313,9 +329,7 @@ class GameState:
                 ball.x_vel += paddle.x_vel / 20
                 return True  # This should flag the paddle sound to be played
 
-    def __update_ball(
-        self, ball: Ball, delta_t: float, audio_instructions: AudioInstructions
-    ):
+    def __update_ball(self, ball: Ball, delta_t: float, sounds: list[SoundReprs]):
         ball.y_vel += Constants.gravity * delta_t
         if ball.x_vel > 0.1:
             ball.x_vel = 0.1
@@ -328,53 +342,55 @@ class GameState:
         ball.y += ball.y_vel
         ball.x += ball.x_vel
         if self.__collision_check_ball_paddle(ball, self.paddle):
-            audio_instructions.queue_sound(SoundReprs.HIT_SOUND)
+            sounds.append(SoundReprs.HIT_SOUND)
         self.__collision_check_ball_wall(ball)
         for block in self.blocks:
             if self.__collision_check_ball_block(ball, block):
-                audio_instructions.queue_sound(SoundReprs.BLOCK_SOUND)
+                sounds.append(SoundReprs.BLOCK_SOUND)
 
-    def __update_game(
-        self, delta_t: float, keys: list[int], audio_instructions: AudioInstructions
-    ):
-        if pygame.K_a in keys:
-            impulse_sign = -1
-        elif pygame.K_d in keys:
-            impulse_sign = +1
+
+class GameState:
+    def __init__(self):
+        self.game_fsm_state = GameFsmState.MENU
+        self.game_exit = False
+        self.settings = Settings()
+
+    def update(
+        self, total_delta_t: float, keyboard_state: KeyboardState, update_reps: int
+    ) -> Tuple[AudioInstructions, GraphicsInstructions]:
+        keys = keyboard_state.get_keys()
+
+        next_fsm_state = self.__next_fsm_state(keyboard_state)
+
+        transition_audio_instructions = AudioInstructions([], None)
+        collision_sounds = AudioInstructions([], None)
+
+        if next_fsm_state != None:
+            transition_audio_instructions = state_transition_audio(
+                self.game_fsm_state, next_fsm_state
+            )
+            self.__on_transition(next_fsm_state)
+
+        if (
+            self.game_fsm_state == GameFsmState.PLAY
+            or self.game_fsm_state == GameFsmState.PAUSE
+        ):
+            if self.game_fsm_state == GameFsmState.PLAY:
+                delta_t = total_delta_t / update_reps
+                sounds = []
+                for _ in range(update_reps):
+                    self.core_game_state.update_game(delta_t, keys, sounds)
+                collision_sounds = AudioInstructions(sounds, None)
+            objects = self.core_game_state.game_objects_to_render()
         else:
-            impulse_sign = 0
+            objects = []
 
-        self.paddle.x_vel += delta_t * (
-            impulse_sign * Constants.user_impulse_per_millisecond
-            - Constants.air_resistance_coefficient * self.paddle.x_vel
-        )
-        self.paddle.x += delta_t * self.paddle.x_vel
+        return transition_audio_instructions.merge(
+            collision_sounds
+        ), GraphicsInstructions(objects, screen_content(self.game_fsm_state))
 
-        if self.paddle.x > Constants.game_width - self.paddle.width:
-            self.paddle.x = Constants.game_width - self.paddle.width
-        elif self.paddle.x < 0:
-            self.paddle.x = 0
-
-        for ball in self.balls:
-            self.__update_ball(ball, delta_t, audio_instructions)
-
-    def __generate_blocks(self) -> list[Block]:
-        blocks = []
-        for i in range(8):
-            for j in range(4):
-                blocks.append(
-                    Block(
-                        100 * i + 2,
-                        50 * j + 2,
-                        95,
-                        45,
-                        tuple((random.randint(0, 255) for i in range(3))),
-                    )
-                )
-        return blocks
-
-    def __game_objects_to_render(self) -> list[GameObject]:
-        return [self.paddle] + self.balls + self.blocks
+    def __initialize_game(self):
+        self.core_game_state = CoreGameState()
 
     def __next_fsm_state(self, keyboard_state: KeyboardState) -> GameFsmState | None:
         keys = keyboard_state.get_keys()
@@ -398,10 +414,13 @@ class GameState:
                 return GameFsmState.PLAY
 
         if self.game_fsm_state == GameFsmState.PLAY:
-            if len(self.balls) == 0:
+            if self.core_game_state.game_over():
                 return GameFsmState.GAME_OVER
-            elif len(self.blocks) == 0:
+            elif self.core_game_state.game_win():
                 return GameFsmState.GAME_WIN
+
+        if keyboard_state.quit:
+            self.game_exit = True
 
     def __on_transition(self, next_state: GameFsmState):
         if (
@@ -418,20 +437,22 @@ class GameState:
 def state_transition_audio(
     current_state: GameFsmState,
     target_state: GameFsmState,
-    audio_instructions: AudioInstructions,
-):
+) -> AudioInstructions:
+    sounds = []
+    new_music = None
     if target_state == GameFsmState.GAME_WIN:
-        audio_instructions.queue_sound(SoundReprs.WIN_SOUND)
-        audio_instructions.queue_music_change(Music.VICTORY)
+        sounds.append(SoundReprs.WIN_SOUND)
+        new_music = Music.VICTORY
     elif target_state == GameFsmState.GAME_OVER:
-        audio_instructions.queue_music_change(Music.GAME_OVER)
+        new_music = Music.GAME_OVER
     elif target_state == GameFsmState.PLAY:
         if current_state in [
             GameFsmState.GAME_OVER,
             GameFsmState.GAME_WIN,
             GameFsmState.MENU,
         ]:
-            audio_instructions.queue_music_change(Music.GAME_PLAY)
+            new_music = Music.GAME_PLAY
+    return AudioInstructions(sounds, new_music)
 
 
 def screen_content(game_fsm_state: GameFsmState) -> list[Message]:
