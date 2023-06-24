@@ -9,10 +9,11 @@ X Implement instructions
 X Implement Menu screen and game restarting
 X Implement music
 X Implement resolution black rectangles
-Implement the settings screen
-Separate out SettingsState being able to change resolution (?)
+X implement the settings screen
+dataclass settings
 Fix the paddle collision bug
-Implement a Colours class (instead of an alias)
+X Implement a Colours class
+Fix screen_content being non-interactive
 Implement "Press L to Launch"
 Implement lives
 Fix hardcoding (settings screen, block generation, etc.)

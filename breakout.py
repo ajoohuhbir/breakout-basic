@@ -7,7 +7,18 @@ from typing import Tuple
 Color = Tuple[float, float, float]
 
 
+class Colors:
+    white = (255, 255, 255)
+    black = (0, 0, 0)
+    dark_gray = (10, 10, 10)
+    random_color = lambda: tuple([random.randint(0, 255) for i in range(3)])
+
+
 class Constants:
+    default_setting_fps = 60
+    default_setting_resolution_width = 800
+    default_setting_resolution_height = 600
+
     game_width = 800
     game_height = 600
     gravity = 0.0002
@@ -20,10 +31,25 @@ class Constants:
     ball_radius = 5
 
 
+@dataclass
 class Settings:
-    fps = 60
-    resolution_width = 800
-    resolution_height = 600
+    fps: int = Constants.default_setting_fps
+    resolution_width: int = Constants.default_setting_resolution_width
+    resolution_height: int = Constants.default_setting_resolution_height
+
+    def set_to_default(self):
+        self.fps = Constants.default_setting_fps
+        self.resolution_width = Constants.default_setting_resolution_width
+        self.resolution_height = Constants.default_setting_resolution_height
+
+    def set_new_settings(self, new: "Settings"):
+        self.fps = new.fps
+        self.resolution_width = new.resolution_width
+        self.resolution_height = new.resolution_height
+
+    def set_new_graphics(self, new: "Settings"):
+        self.resolution_width = new.resolution_width
+        self.resolution_height = new.resolution_height
 
 
 class Sound(Enum):
@@ -46,7 +72,7 @@ class AudioInstructions:
     new_music: Music
 
     def merge(self, other: "AudioInstructions") -> "AudioInstructions":
-        """This will discard the new_music in the other file if both have new_music"""
+        """If both have new music, the one in the caller is preserved"""
         new_queue = self.sound_queue + other.sound_queue
         if self.new_music == None:
             new_music = other.new_music
@@ -143,33 +169,43 @@ UIElement = SettingsSelector | Message
 class GraphicsInstructions:
     objects: list[GameObject]
     ui_elements: list[UIElement]
+    graphics_settings_change: None | Settings = None
 
-    def merge(self, other: "GraphicsInstructions"):
+    def __add__(self, other: "GraphicsInstructions"):
+        """If both have new settings, the ones in the caller are preserved"""
+        new_settings = (
+            self.graphics_settings_change
+            if self.graphics_settings_change != None
+            else other.graphics_settings_change
+        )
         return GraphicsInstructions(
             self.objects + other.objects,
             self.ui_elements + other.ui_elements,
+            new_settings,
         )
 
 
 class Graphics:  # Does not yet support different resolutions
-    def __init__(self):
+    def __init__(self, settings: Settings):
         self.__screen = pygame.display.set_mode(
-            (Settings.resolution_width, Settings.resolution_height)
+            (settings.resolution_width, settings.resolution_height)
         )
-        self.resolution = (Settings.resolution_width, Settings.resolution_height)
-        self.__paddle_color = (255, 255, 255)
-        self.__ball_color = (255, 255, 255)
-        self.__set_game_screen()
+        self.resolution = (settings.resolution_width, settings.resolution_height)
+        self.__paddle_color = Colors.white
+        self.__ball_color = Colors.white
+        self.__set_game_screen(settings)
 
-    def render(self, instructions: GraphicsInstructions):
-        if self.resolution != (Settings.resolution_width, Settings.resolution_height):
-            self.__reset_resolution()
+    def render(self, instructions: GraphicsInstructions, settings: Settings):
+        if instructions.graphics_settings_change != None:
+            settings.set_new_graphics(instructions.graphics_settings_change)
+            print("I am here")
+            self.__reset_resolution(settings)
 
-        self.__screen.fill((0, 0, 0))
+        self.__screen.fill(Colors.black)
 
         pygame.draw.rect(
             self.__screen,
-            (15, 15, 15),
+            Colors.dark_gray,
             [
                 self.game_screen_origin_x,
                 self.game_screen_origin_y,
@@ -184,17 +220,14 @@ class Graphics:  # Does not yet support different resolutions
         for ui_element in instructions.ui_elements:
             self.__render_ui_element(ui_element)
 
-        # for ui_element in instructions.ui_elements:
-        #     self.__render_ui_element(ui_element)
-
         pygame.display.update()
 
-    def __reset_resolution(self):
+    def __reset_resolution(self, settings: Settings):
         self.__screen = pygame.display.set_mode(
-            (Settings.resolution_width, Settings.resolution_height)
+            (settings.resolution_width, settings.resolution_height)
         )
-        self.resolution = (Settings.resolution_width, Settings.resolution_height)
-        self.__set_game_screen()
+        self.resolution = (settings.resolution_width, settings.resolution_height)
+        self.__set_game_screen(settings)
 
     def __render_paddle(self, paddle: Paddle):
         pygame.draw.rect(
@@ -309,22 +342,22 @@ class Graphics:  # Does not yet support different resolutions
         elif type(ui_element) == SettingsSelector:
             self.__render_settings_selector(ui_element)
 
-    def __set_game_screen(self):
+    def __set_game_screen(self, settings: Settings):
         ratio = Constants.game_width / Constants.game_height
-        res_ratio = Settings.resolution_width / Settings.resolution_height
+        res_ratio = settings.resolution_width / settings.resolution_height
         if res_ratio < ratio:
-            self.game_screen_width = Settings.resolution_width
+            self.game_screen_width = settings.resolution_width
             self.game_screen_height = self.game_screen_width / ratio
             self.black_bars = "horizontal"
             self.scaling = self.game_screen_width / Constants.game_width
         elif res_ratio > ratio:
-            self.game_screen_height = Settings.resolution_height
+            self.game_screen_height = settings.resolution_height
             self.game_screen_width = self.game_screen_height * ratio
             self.black_bars = "vertical"
             self.scaling = self.game_screen_height / Constants.game_height
         else:
-            self.game_screen_height = Settings.resolution_height
-            self.game_screen_width = Settings.resolution_width
+            self.game_screen_height = settings.resolution_height
+            self.game_screen_width = settings.resolution_width
             self.black_bars = "none"
             self.scaling = self.game_screen_height / Constants.game_height
 
@@ -333,12 +366,12 @@ class Graphics:  # Does not yet support different resolutions
             self.game_screen_origin_y = 0
         elif self.black_bars == "horizontal":
             self.game_screen_origin_x = 0
-            self.game_screen_origin_y = (Settings.resolution_height / 2) - (
+            self.game_screen_origin_y = (settings.resolution_height / 2) - (
                 self.game_screen_height / 2
             )
         elif self.black_bars == "vertical":
             self.game_screen_origin_y = 0
-            self.game_screen_origin_x = (Settings.resolution_width / 2) - (
+            self.game_screen_origin_x = (settings.resolution_width / 2) - (
                 self.game_screen_width / 2
             )
 
@@ -472,7 +505,7 @@ class CoreGameState:
                         50 * j + 2,
                         95,
                         45,
-                        tuple((random.randint(0, 255) for i in range(3))),
+                        Colors.random_color(),
                     )
                 )
         return blocks
@@ -533,23 +566,27 @@ class CoreGameState:
 
 class SettingsState:
     possible_settings = ["Resolution", "FPS"]
-    possible_resolutions = [(800, 600), (1080, 720)]
-    temp_resolution = 0
-    temp_fps = 60
+    possible_resolutions = [(800, 600), (1080, 720), (400, 300)]
 
-    def __init__(self):
+    def __init__(self, settings: Settings):
         self.changed = False
         self.selector_at = 1
         self.selector = SettingsSelector(
             Constants.game_width / 2, 0.4 * Constants.game_height, 400
         )
-        SettingsState.temp_fps = Settings.fps
-        SettingsState.temp_resolution = SettingsState.possible_resolutions.index(
-            (Settings.resolution_width, Settings.resolution_height)
+        self.temp_fps = settings.fps
+        self.temp_resolution = SettingsState.possible_resolutions.index(
+            (settings.resolution_width, settings.resolution_height)
         )
+        self.settings = settings
 
-    def update(self, keyboard_state: KeyboardState) -> list[SettingsSelector]:
+    def update(
+        self, keyboard_state: KeyboardState
+    ) -> Tuple[Settings, list[SettingsSelector]]:
         keys = keyboard_state.new_keys_pressed
+
+        new_settings = Settings()
+        new_settings.set_new_settings(self.settings)
         if pygame.K_s in keys and not self.changed:
             self.selector_at += 1
             self.selector_at %= len(SettingsState.possible_settings)
@@ -558,26 +595,27 @@ class SettingsState:
             self.selector_at %= len(SettingsState.possible_settings)
         elif pygame.K_d in keys:
             if self.selector_at == 0:
-                SettingsState.temp_resolution += 1
-                SettingsState.temp_resolution %= len(SettingsState.possible_resolutions)
+                self.temp_resolution += 1
+                self.temp_resolution %= len(SettingsState.possible_resolutions)
                 self.changed = True
             elif self.selector_at == 1:
-                SettingsState.temp_fps += 1
+                self.temp_fps += 1
                 self.changed = True
         elif pygame.K_a in keys:
             if self.selector_at == 0:
-                SettingsState.temp_resolution -= 1
-                SettingsState.temp_resolution %= len(SettingsState.possible_resolutions)
+                self.temp_resolution -= 1
+                self.temp_resolution %= len(SettingsState.possible_resolutions)
                 self.changed = True
             elif self.selector_at == 1:
-                SettingsState.temp_fps -= 1
+                self.temp_fps -= 1
                 self.changed = True
         elif pygame.K_RETURN in keys:
-            Settings.fps = SettingsState.temp_fps
+            new_settings.fps = self.temp_fps
             (
-                Settings.resolution_width,
-                Settings.resolution_height,
-            ) = SettingsState.possible_resolutions[SettingsState.temp_resolution]
+                new_settings.resolution_width,
+                new_settings.resolution_height,
+            ) = SettingsState.possible_resolutions[self.temp_resolution]
+            print(new_settings == self.settings)
             self.changed = False
 
         if self.selector_at == 0:
@@ -585,7 +623,7 @@ class SettingsState:
         elif self.selector_at == 1:
             self.selector.y = 0.7 * Constants.game_height
 
-        return [self.selector]
+        return new_settings, [self.selector]
 
 
 class GameState:
@@ -598,6 +636,7 @@ class GameState:
         self, total_delta_t: float, keyboard_state: KeyboardState
     ) -> Tuple[AudioInstructions, GraphicsInstructions]:
         keys = keyboard_state.get_keys()
+        graphics_instructions = GraphicsInstructions([], [], None)
 
         next_fsm_state = self.__next_fsm_state(keyboard_state)
 
@@ -620,15 +659,25 @@ class GameState:
                 sounds, objects = self.core_game_state.update(total_delta_t, keys)
                 collision_sounds = AudioInstructions(sounds, None)
         elif self.game_fsm_state == GameFsmState.SETTINGS:
-            ui_elements = self.settings_state.update(keyboard_state)
+            new_settings, ui_elements = self.settings_state.update(keyboard_state)
+            if new_settings == self.settings:
+                new_settings = None
 
+            graphics_instructions += GraphicsInstructions([], [], new_settings)
+
+        screen_ui = (
+            screen_content(self.game_fsm_state)
+            if self.game_fsm_state != GameFsmState.SETTINGS
+            else screen_content(GameFsmState.SETTINGS, self.settings_state)
+        )
         screen_graphics = GraphicsInstructions(
-            objects, screen_content(self.game_fsm_state)
+            objects,
+            screen_ui,
         )
         ui_graphics = GraphicsInstructions([], ui_elements)
 
         audio_instructions = transition_audio_instructions.merge(collision_sounds)
-        graphics_instructions = screen_graphics.merge(ui_graphics)
+        graphics_instructions += screen_graphics + ui_graphics
 
         return audio_instructions, graphics_instructions
 
@@ -688,7 +737,7 @@ class GameState:
             self.__initialize_game()
 
         elif next_state == GameFsmState.SETTINGS:
-            self.settings_state = SettingsState()
+            self.settings_state = SettingsState(self.settings)
 
         if next_state == GameFsmState.QUIT:
             self.game_exit = True
@@ -717,7 +766,9 @@ def state_transition_audio(
     return AudioInstructions(sounds, new_music)
 
 
-def screen_content(game_fsm_state: GameFsmState) -> list[Message]:
+def screen_content(
+    game_fsm_state: GameFsmState, settings_state: SettingsState = None
+) -> list[Message]:
     answer = []
     if game_fsm_state == GameFsmState.MENU:
         answer.append(
@@ -869,10 +920,10 @@ def screen_content(game_fsm_state: GameFsmState) -> list[Message]:
         answer.append(
             Message(
                 "Resolution              :             {} x {}".format(
-                    SettingsState.possible_resolutions[SettingsState.temp_resolution][
+                    SettingsState.possible_resolutions[settings_state.temp_resolution][
                         0
                     ],
-                    SettingsState.possible_resolutions[SettingsState.temp_resolution][
+                    SettingsState.possible_resolutions[settings_state.temp_resolution][
                         1
                     ],
                 ),
@@ -883,7 +934,7 @@ def screen_content(game_fsm_state: GameFsmState) -> list[Message]:
         )
         answer.append(
             Message(
-                "FPS              :             {}".format(SettingsState.temp_fps),
+                "FPS              :             {}".format(settings_state.temp_fps),
                 25,
                 Constants.game_width / 2,
                 0.7 * Constants.game_height,
@@ -897,7 +948,7 @@ def GameLoop():
     game = GameState()
     clock = pygame.time.Clock()
     audio = Audio()
-    graphics = Graphics()
+    graphics = Graphics(game.settings)
     keyboard_state = KeyboardState()
 
     while not game.game_exit:
@@ -910,7 +961,7 @@ def GameLoop():
         )
 
         audio.run(audio_instructions)
-        graphics.render(graphics_instructions)
+        graphics.render(graphics_instructions, game.settings)
 
         keyboard_state.handle_pygame_events()
 
