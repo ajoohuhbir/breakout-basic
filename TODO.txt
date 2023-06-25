@@ -10,7 +10,12 @@ X Implement Menu screen and game restarting
 X Implement music
 X Implement resolution black rectangles
 X implement the settings screen
-dataclass settings
+X dataclass settings
+Settings improvements
+    have a graphics settings class inside settings
+    don't mutate game.settings through graphics
+    in constants have a default settings object
+    clean up new settings issue
 Fix the paddle collision bug
 X Implement a Colours class
 Fix screen_content being non-interactive
