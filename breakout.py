@@ -4,6 +4,7 @@ from enum import Enum
 from dataclasses import dataclass
 import dataclasses
 from typing import Tuple
+import copy
 
 Color = Tuple[float, float, float]
 
@@ -190,12 +191,12 @@ class Graphics:  # Does not yet support different resolutions
         )
         self.__paddle_color = Colors.white
         self.__ball_color = Colors.white
-        self.graphics_settings = graphics_settings
+        self.graphics_settings = copy.deepcopy(graphics_settings)
         self.__set_game_screen()
 
     def render(self, instructions: GraphicsInstructions):
         if instructions.graphics_settings_change != None:
-            self.graphics_settings = dataclasses.replace(
+            self.graphics_settings = copy.deepcopy(
                 instructions.graphics_settings_change
             )
             self.__reset_resolution()
@@ -221,12 +222,18 @@ class Graphics:  # Does not yet support different resolutions
 
         pygame.display.update()
 
-    def __reset_resolution(self, settings: Settings):
+    def __reset_resolution(self):
         self.__screen = pygame.display.set_mode(
-            (settings.resolution_width, settings.resolution_height)
+            (
+                self.graphics_settings.resolution_width,
+                self.graphics_settings.resolution_height,
+            )
         )
-        self.resolution = (settings.resolution_width, settings.resolution_height)
-        self.__set_game_screen(settings)
+        self.resolution = (
+            self.graphics_settings.resolution_width,
+            self.graphics_settings.resolution_height,
+        )
+        self.__set_game_screen()
 
     def __render_paddle(self, paddle: Paddle):
         pygame.draw.rect(
@@ -590,7 +597,7 @@ class SettingsState:
     ) -> Tuple[Settings, list[SettingsSelector]]:
         keys = keyboard_state.new_keys_pressed
 
-        new_settings = dataclasses.replace(self.settings)
+        new_settings = copy.deepcopy(self.settings)
         if pygame.K_s in keys and not self.changed:
             self.selector_at += 1
             self.selector_at %= len(SettingsState.possible_settings)
@@ -619,9 +626,6 @@ class SettingsState:
                 new_settings.graphics_settings.resolution_width,
                 new_settings.graphics_settings.resolution_height,
             ) = SettingsState.possible_resolutions[self.temp_resolution]
-            print(new_settings.graphics_settings.resolution_width)
-            print(self.settings.graphics_settings.resolution_width)
-            print(new_settings == self.settings)
             self.changed = False
 
         if self.selector_at == 0:
@@ -632,7 +636,7 @@ class SettingsState:
         if new_settings == self.settings:
             new_settings = None
         else:
-            self.settings = dataclasses.replace(self.settings)
+            self.settings = copy.deepcopy(new_settings)
 
         return new_settings, [self.selector]
 
@@ -641,7 +645,7 @@ class GameState:
     def __init__(self):
         self.game_fsm_state = GameFsmState.MENU
         self.game_exit = False
-        self.settings = dataclasses.replace(Constants.default_settings)
+        self.settings = copy.deepcopy(Constants.default_settings)
 
     def update(
         self, total_delta_t: float, keyboard_state: KeyboardState
@@ -672,7 +676,7 @@ class GameState:
         elif self.game_fsm_state == GameFsmState.SETTINGS:
             new_settings, ui_elements = self.settings_state.update(keyboard_state)
             if new_settings != None:
-                self.settings = dataclasses.replace(new_settings)
+                self.settings = copy.deepcopy(new_settings)
                 graphics_instructions += GraphicsInstructions(
                     [], [], new_settings.graphics_settings
                 )
