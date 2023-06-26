@@ -20,7 +20,7 @@ X Remove balls list
 X Implement invariant checker
 X Color is-bright function
 X Implement sets in keyboard_state
-Fix the paddle collision bug
+X Fix the paddle collision bug
 X Implement a Colours class
 Implement "Press L to Launch"
 Implement lives

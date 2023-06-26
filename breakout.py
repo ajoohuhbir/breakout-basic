@@ -555,11 +555,26 @@ class CoreGameState:
             ball.y_vel *= -1
 
     def __collision_check_ball_paddle(self, ball: Ball, paddle: Paddle) -> bool:
-        if ball.y >= paddle.y and ball.y <= paddle.y + paddle.height:
-            if ball.x > paddle.x and ball.x < paddle.x + paddle.width:
+        collision_occurred = False
+        if (
+            paddle.y - ball.radius <= ball.y <= paddle.y + paddle.height
+            and paddle.x - ball.radius
+            <= ball.x
+            <= paddle.x + paddle.width + ball.radius
+        ):
+            if ball.y <= paddle.y and ball.y_vel > 0:
                 ball.y_vel *= -1
                 ball.x_vel += paddle.x_vel / 20
-                return True  # This should flag the paddle sound to be played
+                collision_occurred = True
+            elif (
+                ball.y >= paddle.y
+                and ball.y_vel > 0
+                and (ball.x < paddle.x or ball.x > paddle.x + paddle.width)
+            ):
+                ball.y_vel *= -1
+                ball.x_vel += paddle.x_vel
+                collision_occurred = True
+        return collision_occurred  # This should flag the paddle sound to be played
 
     def __update_ball(self, ball: Ball, delta_t: float, output_sounds: list[Sound]):
         ball.y_vel += Constants.gravity * delta_t
