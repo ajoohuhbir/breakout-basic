@@ -28,28 +28,31 @@ Fix hardcoding (settings screen, block generation, etc.)
 Fix screen_content being non-interactive
 Make the damn music match
 
-Implementable features:
+POSSIBLE FUTURE FEATURES:
 Block "Health"
-Ability to ain first launch, with some spread
+Block "Features," like "protects those around it", "heals those around it", "revives after some time", "Explodes and destroys nearby blocks if hit but only if hit before timer runs out"
+Ability to aim first launch, with some spread
+"Powerups," like temporary piercings, additional lives, etc.
 "Skills," like "last chance: revive if few enough blocks left" or "piercing on first shot"
+Saving progress
+Better UI
 
-Separation issues:
-
-can't get color out of block
-
-
-
-
-
+SEPARATION ISSUES:
+X can't get color out of block
+    Fine for now; actual solution is a "graphical shadow"
 
 BUGS:
 X Flickering pause screen
     Fixed by rendering the pause screen only once, at the start, and only running input handling in the pause loop
+X Paddle collision wonky if on side
+For one frame, the paddle shows the ball on it even when no lives are left
+When starting from new_life, paddle collision sound is heard
 
 QUESTIONS:
-
-Isn't rendering only the changing parts of a screen more "efficient"?
+X Isn't rendering only the changing parts of a screen more "efficient"?
 X GameObjects inheritance
 X Should I use sets in the input handler? Is that better?
 X Ask about "backwards programming"
 X One "Data" class can suffice for settings, constants etc. Is this inheritance? Can I just use less classes?
+Awkwardness : Storing lives inside paddle
+Awkwardness : GameState reaching inside core game state to set ball velocity when launched

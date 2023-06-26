@@ -13,6 +13,7 @@ class Colors:
     white = (255, 255, 255)
     black = (0, 0, 0)
     dark_gray = (10, 10, 10)
+    red = (255, 0, 0)
 
     @classmethod
     def generate_random_block_color(cls) -> Color:
@@ -52,6 +53,8 @@ class Constants:
     init_max_x_vel_ball = 0.05
     max_x_vel_ball = 0.1
     ball_radius = 5
+    initial_lives = 3
+    life_width = 5
 
 
 class Sound(Enum):
@@ -66,7 +69,7 @@ class Music(Enum):
     GAME_OVER = "game over.mp3"
     GAME_PLAY = "music.mp3"
     VICTORY = "win music.mp3"
-    PRE_LAUNCH = "pre-launch.mp3"
+    PRE_LAUNCH_UNIMPLEMENTED = "pre-launch.mp3"
 
 
 @dataclass
@@ -102,7 +105,7 @@ class Audio:
             Music.GAME_OVER: "game over.mp3",
             Music.GAME_PLAY: "music.mp3",
             Music.VICTORY: "win music.mp3",
-            Music.PRE_LAUNCH: "pre-launch.mp3",
+            Music.PRE_LAUNCH_UNIMPLEMENTED: "pre-launch.mp3",
         }
         self.__player = pygame.mixer.music
         self.__player.load(self.__to_music[Music.MENU])
@@ -145,6 +148,7 @@ class Paddle:
     width: float
     height: float
     x_vel: float
+    lives: float
 
 
 @dataclass
@@ -256,6 +260,31 @@ class Graphics:  # Does not yet support different resolutions
                 self.scaling * paddle.height,
             ],
         )
+        self.__render_lives(paddle)
+
+    def __render_lives(self, paddle: Paddle):
+        num = paddle.lives
+        life_width = Constants.life_width
+
+        if num == 1:
+            mids = [0.5]
+        elif num % 2 == 1:
+            each_side = int((num - 1) / 2)
+            mids = [
+                0.5 + (0.25 / each_side) * i
+                for i in range(-1 * each_side, each_side + 1)
+            ]
+        else:
+            mids = [0.5 + i * (0.25 / num) for i in range(-(num - 1), (num - 1) + 1, 2)]
+
+        actual_mids = [paddle.x + paddle.width * i for i in mids]
+
+        for mid in actual_mids:
+            pygame.draw.rect(
+                self.__screen,
+                Colors.red,
+                [mid - life_width / 2, paddle.y, life_width, paddle.height],
+            )
 
     def __render_block(self, block: Block):
         pygame.draw.rect(
@@ -450,12 +479,14 @@ class GameFsmState(Enum):
 
 class CoreGameState:
     def __init__(self):
+        self.lives = Constants.initial_lives
         self.paddle = Paddle(
             Constants.game_width / 2 - 50,
             0.9 * Constants.game_height,
             100,
             10,
             0,
+            self.lives,
         )
         self.ball = Ball(
             Constants.game_width / 2,
@@ -464,11 +495,12 @@ class CoreGameState:
                 -1 * Constants.init_max_x_vel_ball,
                 Constants.init_max_x_vel_ball,
             ),
-            Constants.init_y_vel_ball,
+            0,
             Constants.ball_radius,
         )
 
         self.blocks = self.__generate_blocks()
+        self.new_life = False
 
     def update(
         self, total_delta_t: float, keys: list[int], game_fsm_state
@@ -483,12 +515,19 @@ class CoreGameState:
         return output_sounds, self.__game_objects_to_render()
 
     def game_over(self) -> bool:
-        condition = self.ball.has_fallen
+        condition = self.lives == 0
         return True if condition else False
 
     def game_win(self) -> bool:
         condition = len(self.blocks) == 0
         return True if condition else False
+
+    def start_new_life(self) -> bool:
+        if self.new_life == True:
+            self.new_life = False
+            return True
+        else:
+            return False
 
     def __update_game_physics(
         self, delta_t: float, keys: list[int], output_sounds: list[Sound]
@@ -588,7 +627,8 @@ class CoreGameState:
             ball.x_vel = -0.1
 
         if ball.y > Constants.game_height + ball.radius:
-            self.ball.has_fallen = True
+            self.lives -= 1
+            self.__new_life()
 
         ball.y += ball.y_vel
         ball.x += ball.x_vel
@@ -598,6 +638,20 @@ class CoreGameState:
         for block in self.blocks:
             if self.__collision_check_ball_block(ball, block):
                 output_sounds.append(Sound.BLOCK_SOUND)
+
+    def __new_life(self):
+        self.paddle.lives = self.lives
+        self.ball = Ball(
+            self.paddle.x + self.paddle.width / 2,
+            self.paddle.y - Constants.ball_radius,
+            random.uniform(
+                -1 * Constants.init_max_x_vel_ball,
+                Constants.init_max_x_vel_ball,
+            ),
+            0,
+            Constants.ball_radius,
+        )
+        self.new_life = True
 
 
 class SettingsState:
@@ -765,6 +819,8 @@ class GameState:
                 return GameFsmState.GAME_OVER
             elif self.core_game_state.game_win():
                 return GameFsmState.GAME_WIN
+            elif self.core_game_state.start_new_life():
+                return GameFsmState.PRE_PLAY
             elif pygame.K_p in keyboard_state.new_keys_pressed:
                 return GameFsmState.PAUSE
 
@@ -780,8 +836,17 @@ class GameState:
             self.game_exit = True
 
     def __on_transition(self, next_state: GameFsmState):
-        if next_state == GameFsmState.PRE_PLAY:
+        if (
+            next_state == GameFsmState.PRE_PLAY
+            and self.game_fsm_state == GameFsmState.MENU
+        ):
             self.__initialize_game()
+
+        elif (
+            next_state == GameFsmState.PLAY
+            and self.game_fsm_state == GameFsmState.PRE_PLAY
+        ):
+            self.core_game_state.ball.y_vel = Constants.init_y_vel_ball
 
         elif next_state == GameFsmState.SETTINGS:
             self.settings_state = SettingsState(self.settings)
@@ -803,11 +868,11 @@ def state_transition_audio(
         new_music = Music.VICTORY
     elif target_state == GameFsmState.GAME_OVER:
         new_music = Music.GAME_OVER
-    elif target_state == GameFsmState.PLAY:
-        if current_state == GameFsmState.PRE_PLAY:
-            new_music = Music.GAME_PLAY
-    elif target_state == GameFsmState.PRE_PLAY:
-        new_music = Music.PRE_LAUNCH
+    # elif target_state == GameFsmState.PLAY:
+    #     if current_state == GameFsmState.PRE_PLAY:
+    #         new_music = Music.GAME_PLAY
+    elif target_state == GameFsmState.PRE_PLAY and current_state == GameFsmState.MENU:
+        new_music = Music.GAME_PLAY
     return AudioInstructions(sounds, new_music)
 
 
@@ -821,12 +886,28 @@ def screen_content(
                 "Welcome to Breakout!",
                 50,
                 Constants.game_width / 2,
-                Constants.game_height / 2,
+                0.3 * Constants.game_height,
             )
         )
         answer.append(
             Message(
                 "Press P to play",
+                25,
+                Constants.game_width / 2,
+                0.5 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Press I for instructions",
+                25,
+                Constants.game_width / 2,
+                0.6 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Press S for settings",
                 25,
                 Constants.game_width / 2,
                 0.7 * Constants.game_height,
@@ -983,6 +1064,23 @@ def screen_content(
                 25,
                 Constants.game_width / 2,
                 0.7 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Press M to return to the menu",
+                25,
+                Constants.game_width / 2,
+                0.9 * Constants.game_height,
+            )
+        )
+    elif game_fsm_state == GameFsmState.PRE_PLAY:
+        answer.append(
+            Message(
+                "Press L to launch",
+                25,
+                Constants.game_width / 2,
+                0.8 * Constants.game_height,
             )
         )
 
