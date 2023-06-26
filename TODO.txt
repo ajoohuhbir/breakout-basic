@@ -22,10 +22,16 @@ X Color is-bright function
 X Implement sets in keyboard_state
 X Fix the paddle collision bug
 X Implement a Colours class
-Implement "Press L to Launch"
+X Implement "Press L to Launch"
 Implement lives
 Fix hardcoding (settings screen, block generation, etc.)
 Fix screen_content being non-interactive
+Make the damn music match
+
+Implementable features:
+Block "Health"
+Ability to ain first launch, with some spread
+"Skills," like "last chance: revive if few enough blocks left" or "piercing on first shot"
 
 Separation issues:
 

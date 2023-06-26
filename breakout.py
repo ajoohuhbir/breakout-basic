@@ -66,6 +66,7 @@ class Music(Enum):
     GAME_OVER = "game over.mp3"
     GAME_PLAY = "music.mp3"
     VICTORY = "win music.mp3"
+    PRE_LAUNCH = "pre-launch.mp3"
 
 
 @dataclass
@@ -101,6 +102,7 @@ class Audio:
             Music.GAME_OVER: "game over.mp3",
             Music.GAME_PLAY: "music.mp3",
             Music.VICTORY: "win music.mp3",
+            Music.PRE_LAUNCH: "pre-launch.mp3",
         }
         self.__player = pygame.mixer.music
         self.__player.load(self.__to_music[Music.MENU])
@@ -109,7 +111,7 @@ class Audio:
     def __change_music(self, music: str):
         self.__player.unload()
         self.__player.load(music)
-        self.__player.play()
+        self.__player.play(-1)
 
     def run(self, instructions: AudioInstructions):
         for sound_repr in instructions.sound_queue:
@@ -443,6 +445,7 @@ class GameFsmState(Enum):
     QUIT = "quit"
     INSTRUCTIONS = "instructions"
     SETTINGS = "settings"
+    PRE_PLAY = "pre play"
 
 
 class CoreGameState:
@@ -456,7 +459,7 @@ class CoreGameState:
         )
         self.ball = Ball(
             Constants.game_width / 2,
-            self.paddle.y - 50,
+            self.paddle.y - Constants.ball_radius,
             random.uniform(
                 -1 * Constants.init_max_x_vel_ball,
                 Constants.init_max_x_vel_ball,
@@ -468,13 +471,14 @@ class CoreGameState:
         self.blocks = self.__generate_blocks()
 
     def update(
-        self, total_delta_t: float, keys: list[int]
+        self, total_delta_t: float, keys: list[int], game_fsm_state
     ) -> Tuple[list[Sound], list[GameObject]]:
         delta_t = total_delta_t / Constants.update_repetitions
         output_sounds = []
 
-        for _ in range(Constants.update_repetitions):
-            self.__update_game_physics(delta_t, keys, output_sounds)
+        if game_fsm_state == GameFsmState.PLAY:
+            for _ in range(Constants.update_repetitions):
+                self.__update_game_physics(delta_t, keys, output_sounds)
 
         return output_sounds, self.__game_objects_to_render()
 
@@ -690,13 +694,15 @@ class GameState:
 
         objects = []
         ui_elements = []
-        if (
-            self.game_fsm_state == GameFsmState.PLAY
-            or self.game_fsm_state == GameFsmState.PAUSE
-        ):
-            if self.game_fsm_state == GameFsmState.PLAY:
-                sounds, objects = self.core_game_state.update(total_delta_t, keys)
-                collision_sounds = AudioInstructions(sounds, None)
+        if self.game_fsm_state in [
+            GameFsmState.PLAY,
+            GameFsmState.PAUSE,
+            GameFsmState.PRE_PLAY,
+        ]:  # Should this be a set?
+            sounds, objects = self.core_game_state.update(
+                total_delta_t, keys, self.game_fsm_state
+            )
+            collision_sounds = AudioInstructions(sounds, None)
         elif self.game_fsm_state == GameFsmState.SETTINGS:
             new_settings, ui_elements = self.settings_state.update(keyboard_state)
             if new_settings != None:
@@ -729,7 +735,7 @@ class GameState:
 
         if self.game_fsm_state == GameFsmState.MENU:
             if pygame.K_p in keyboard_state.new_keys_pressed:
-                return GameFsmState.PLAY
+                return GameFsmState.PRE_PLAY
             elif pygame.K_q in keys:
                 return GameFsmState.QUIT
             elif pygame.K_i in keys:
@@ -750,7 +756,7 @@ class GameState:
             GameFsmState.GAME_WIN,
         ]:
             if pygame.K_r in keys:
-                return GameFsmState.PLAY
+                return GameFsmState.PRE_PLAY
             elif pygame.K_q in keys:
                 return GameFsmState.QUIT
 
@@ -766,14 +772,15 @@ class GameState:
             if pygame.K_p in keyboard_state.new_keys_pressed:
                 return GameFsmState.PLAY
 
+        elif self.game_fsm_state == GameFsmState.PRE_PLAY:
+            if pygame.K_l in keys:
+                return GameFsmState.PLAY
+
         if keyboard_state.quit:
             self.game_exit = True
 
     def __on_transition(self, next_state: GameFsmState):
-        if (
-            next_state == GameFsmState.PLAY
-            and self.game_fsm_state != GameFsmState.PAUSE
-        ):
+        if next_state == GameFsmState.PRE_PLAY:
             self.__initialize_game()
 
         elif next_state == GameFsmState.SETTINGS:
@@ -797,12 +804,10 @@ def state_transition_audio(
     elif target_state == GameFsmState.GAME_OVER:
         new_music = Music.GAME_OVER
     elif target_state == GameFsmState.PLAY:
-        if current_state in [
-            GameFsmState.GAME_OVER,
-            GameFsmState.GAME_WIN,
-            GameFsmState.MENU,
-        ]:
+        if current_state == GameFsmState.PRE_PLAY:
             new_music = Music.GAME_PLAY
+    elif target_state == GameFsmState.PRE_PLAY:
+        new_music = Music.PRE_LAUNCH
     return AudioInstructions(sounds, new_music)
 
 
