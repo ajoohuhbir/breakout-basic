@@ -11,18 +11,21 @@ X Implement music
 X Implement resolution black rectangles
 X implement the settings screen
 X dataclass settings
-Settings improvements
+X Settings improvements
     have a graphics settings class inside settings
     don't mutate game.settings through graphics
     in constants have a default settings object
     clean up new settings issue
+X Remove balls list
+X Implement invariant checker
+X Color is-bright function
+X Implement sets in keyboard_state
 Fix the paddle collision bug
 X Implement a Colours class
-Fix screen_content being non-interactive
 Implement "Press L to Launch"
 Implement lives
 Fix hardcoding (settings screen, block generation, etc.)
-
+Fix screen_content being non-interactive
 
 Separation issues:
 
@@ -41,6 +44,6 @@ QUESTIONS:
 
 Isn't rendering only the changing parts of a screen more "efficient"?
 X GameObjects inheritance
-Should I use sets in the input handler? Is that better?
+X Should I use sets in the input handler? Is that better?
 X Ask about "backwards programming"
 X One "Data" class can suffice for settings, constants etc. Is this inheritance? Can I just use less classes?

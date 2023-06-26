@@ -15,8 +15,15 @@ class Colors:
     dark_gray = (10, 10, 10)
 
     @classmethod
-    def generate_random(cls):
-        return tuple([random.randint(0, 255) for i in range(3)])
+    def generate_random_block_color(cls) -> Color:
+        color = tuple([random.randint(0, 255) for i in range(3)])
+        return (
+            color if Colors.is_bright(color) else Colors.generate_random_block_color()
+        )
+
+    @classmethod
+    def is_bright(cls, color: Color, brightness: int = 20) -> bool:
+        return not [i < brightness for i in color] == [True, True, True]
 
 
 @dataclass
@@ -145,6 +152,7 @@ class Ball:
     x_vel: float
     y_vel: float
     radius: float
+    has_fallen: bool = False
 
 
 @dataclass
@@ -400,18 +408,20 @@ class Graphics:  # Does not yet support different resolutions
 
 class KeyboardState:
     def __init__(self):
-        self.new_keys_pressed = []
-        self.currently_pressed_keys = []
+        self.new_keys_pressed = set()
+        self.currently_pressed_keys = set()
         self.quit = False
 
     def handle_pygame_events(self):
-        self.currently_pressed_keys.extend(self.new_keys_pressed)
-        self.new_keys_pressed = []
+        self.currently_pressed_keys = self.currently_pressed_keys.union(
+            self.new_keys_pressed
+        )
+        self.new_keys_pressed = set()
 
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key not in self.currently_pressed_keys:
-                    self.new_keys_pressed.append(event.key)
+                    self.new_keys_pressed.add(event.key)
             elif event.type == pygame.KEYUP:
                 if (
                     event.key in self.currently_pressed_keys
@@ -421,7 +431,7 @@ class KeyboardState:
                 self.quit = True
 
     def get_keys(self):
-        return self.currently_pressed_keys + self.new_keys_pressed
+        return self.currently_pressed_keys.union(self.new_keys_pressed)
 
 
 class GameFsmState(Enum):
@@ -444,18 +454,17 @@ class CoreGameState:
             10,
             0,
         )
-        self.balls = [
-            Ball(
-                Constants.game_width / 2,
-                self.paddle.y - 50,
-                random.uniform(
-                    -1 * Constants.init_max_x_vel_ball,
-                    Constants.init_max_x_vel_ball,
-                ),
-                Constants.init_y_vel_ball,
-                Constants.ball_radius,
-            )
-        ]
+        self.ball = Ball(
+            Constants.game_width / 2,
+            self.paddle.y - 50,
+            random.uniform(
+                -1 * Constants.init_max_x_vel_ball,
+                Constants.init_max_x_vel_ball,
+            ),
+            Constants.init_y_vel_ball,
+            Constants.ball_radius,
+        )
+
         self.blocks = self.__generate_blocks()
 
     def update(
@@ -470,7 +479,7 @@ class CoreGameState:
         return output_sounds, self.__game_objects_to_render()
 
     def game_over(self) -> bool:
-        condition = len(self.balls) == 0
+        condition = self.ball.has_fallen
         return True if condition else False
 
     def game_win(self) -> bool:
@@ -498,11 +507,10 @@ class CoreGameState:
         elif self.paddle.x < 0:
             self.paddle.x = 0
 
-        for ball in self.balls:
-            self.__update_ball(ball, delta_t, output_sounds)
+        self.__update_ball(self.ball, delta_t, output_sounds)
 
     def __game_objects_to_render(self) -> list[GameObject]:
-        return [self.paddle] + self.balls + self.blocks
+        return [self.paddle] + [self.ball] + self.blocks
 
     def __generate_blocks(self) -> list[Block]:
         blocks = []
@@ -514,7 +522,7 @@ class CoreGameState:
                         50 * j + 2,
                         95,
                         45,
-                        Colors.generate_random(),
+                        Colors.generate_random_block_color(),
                     )
                 )
         return blocks
@@ -561,7 +569,7 @@ class CoreGameState:
             ball.x_vel = -0.1
 
         if ball.y > Constants.game_height + ball.radius:
-            self.balls.remove(ball)
+            self.ball.has_fallen = True
 
         ball.y += ball.y_vel
         ball.x += ball.x_vel
@@ -646,6 +654,7 @@ class GameState:
         self.game_fsm_state = GameFsmState.MENU
         self.game_exit = False
         self.settings = copy.deepcopy(Constants.default_settings)
+        self.settings_state = None
 
     def update(
         self, total_delta_t: float, keyboard_state: KeyboardState
@@ -960,6 +969,12 @@ def screen_content(
     return answer
 
 
+def check_invariants(game: GameState, graphics: Graphics):
+    assert game.settings.graphics_settings == graphics.graphics_settings
+    if game.settings_state != None:
+        assert game.settings == game.settings_state.settings
+
+
 def GameLoop():
     game = GameState()
     clock = pygame.time.Clock()
@@ -980,6 +995,7 @@ def GameLoop():
         graphics.render(graphics_instructions)
 
         keyboard_state.handle_pygame_events()
+        check_invariants(game, graphics)
 
 
 def main():
