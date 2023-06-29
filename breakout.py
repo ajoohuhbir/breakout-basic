@@ -529,6 +529,18 @@ class CoreGameState:
         else:
             return False
 
+    def make_new_ball(self):
+        self.ball = Ball(
+            self.paddle.x + self.paddle.width / 2,
+            self.paddle.y - Constants.ball_radius,
+            random.uniform(
+                -1 * Constants.init_max_x_vel_ball,
+                Constants.init_max_x_vel_ball,
+            ),
+            0,
+            Constants.ball_radius,
+        )
+
     def __update_game_physics(
         self, delta_t: float, keys: list[int], output_sounds: list[Sound]
     ):
@@ -550,7 +562,8 @@ class CoreGameState:
         elif self.paddle.x < 0:
             self.paddle.x = 0
 
-        self.__update_ball(self.ball, delta_t, output_sounds)
+        if self.ball != None:
+            self.__update_ball(self.ball, delta_t, output_sounds)
 
     def __game_objects_to_render(self) -> list[GameObject]:
         return [self.paddle] + [self.ball] + self.blocks
@@ -599,20 +612,21 @@ class CoreGameState:
 
     def __collision_check_ball_paddle(self, ball: Ball, paddle: Paddle) -> bool:
         collision_occurred = False
+        if ball.y_vel <= 0:
+            return False
+
         if (
             paddle.y - ball.radius <= ball.y <= paddle.y + paddle.height
             and paddle.x - ball.radius
             <= ball.x
             <= paddle.x + paddle.width + ball.radius
         ):
-            if ball.y <= paddle.y and ball.y_vel > 0:
+            if ball.y <= paddle.y:
                 ball.y_vel *= -1
                 ball.x_vel += paddle.x_vel / 20
                 collision_occurred = True
-            elif (
-                ball.y >= paddle.y
-                and ball.y_vel > 0
-                and (ball.x < paddle.x or ball.x > paddle.x + paddle.width)
+            elif ball.y >= paddle.y and (
+                ball.x < paddle.x or ball.x > paddle.x + paddle.width
             ):
                 ball.y_vel *= -1
                 ball.x_vel += paddle.x_vel
@@ -630,27 +644,21 @@ class CoreGameState:
             self.lives -= 1
             self.__new_life()
 
-        ball.y += ball.y_vel
-        ball.x += ball.x_vel
-        if self.__collision_check_ball_paddle(ball, self.paddle):
-            output_sounds.append(Sound.HIT_SOUND)
-        self.__collision_check_ball_wall(ball)
-        for block in self.blocks:
-            if self.__collision_check_ball_block(ball, block):
-                output_sounds.append(Sound.BLOCK_SOUND)
+        else:
+            ball.y += ball.y_vel
+            ball.x += ball.x_vel
+            if self.__collision_check_ball_paddle(ball, self.paddle):
+                output_sounds.append(Sound.HIT_SOUND)
+                if self.new_life:
+                    print("ahh", self.lives, self.ball.y_vel)
+            self.__collision_check_ball_wall(ball)
+            for block in self.blocks:
+                if self.__collision_check_ball_block(ball, block):
+                    output_sounds.append(Sound.BLOCK_SOUND)
 
     def __new_life(self):
         self.paddle.lives = self.lives
-        self.ball = Ball(
-            self.paddle.x + self.paddle.width / 2,
-            self.paddle.y - Constants.ball_radius,
-            random.uniform(
-                -1 * Constants.init_max_x_vel_ball,
-                Constants.init_max_x_vel_ball,
-            ),
-            0,
-            Constants.ball_radius,
-        )
+        self.ball = None
         self.new_life = True
 
 
@@ -836,17 +844,24 @@ class GameState:
             self.game_exit = True
 
     def __on_transition(self, next_state: GameFsmState):
-        if (
-            next_state == GameFsmState.PRE_PLAY
-            and self.game_fsm_state == GameFsmState.MENU
-        ):
-            self.__initialize_game()
+        if next_state == GameFsmState.PRE_PLAY:
+            if self.game_fsm_state in [
+                GameFsmState.MENU,
+                GameFsmState.GAME_OVER,
+                GameFsmState.GAME_WIN,
+            ]:
+                self.__initialize_game()
+            elif self.game_fsm_state == GameFsmState.PLAY:
+                self.core_game_state.make_new_ball()
 
         elif (
             next_state == GameFsmState.PLAY
             and self.game_fsm_state == GameFsmState.PRE_PLAY
         ):
             self.core_game_state.ball.y_vel = Constants.init_y_vel_ball
+
+        elif next_state == GameFsmState.GAME_OVER:
+            self.core_game_state = None
 
         elif next_state == GameFsmState.SETTINGS:
             self.settings_state = SettingsState(self.settings)
@@ -871,7 +886,7 @@ def state_transition_audio(
     # elif target_state == GameFsmState.PLAY:
     #     if current_state == GameFsmState.PRE_PLAY:
     #         new_music = Music.GAME_PLAY
-    elif target_state == GameFsmState.PRE_PLAY and current_state == GameFsmState.MENU:
+    elif target_state == GameFsmState.PRE_PLAY and current_state != GameFsmState.PLAY:
         new_music = Music.GAME_PLAY
     return AudioInstructions(sounds, new_music)
 

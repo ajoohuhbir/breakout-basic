@@ -23,7 +23,7 @@ X Implement sets in keyboard_state
 X Fix the paddle collision bug
 X Implement a Colours class
 X Implement "Press L to Launch"
-Implement lives
+X Implement lives
 Fix hardcoding (settings screen, block generation, etc.)
 Fix screen_content being non-interactive
 Make the damn music match
