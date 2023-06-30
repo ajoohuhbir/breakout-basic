@@ -47,8 +47,9 @@ X Flickering pause screen
 X Paddle collision wonky if on side
 X For one frame, the paddle shows the ball on it even when no lives are left
 X When starting from new_life, paddle collision sound is heard
+X BIG BUG IN UPDATE BALL! CHANGING POSITION THROUGH VELOCITY DOESN'T INCORPORATE DELTA T!
+Lives and powerup block signs aren't resolution invariant
 Paddle movement wonky
-BIG BUG IN UPDATE BALL! CHANGING POSITION THROUGH VELOCITY DOESN'T INCORPORATE DELTA T!
 
 QUESTIONS:
 X Isn't rendering only the changing parts of a screen more "efficient"?

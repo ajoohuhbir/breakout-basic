@@ -332,7 +332,12 @@ class Graphics:  # Does not yet support different resolutions
             pygame.draw.rect(
                 self.__screen,
                 Colors.red,
-                [mid - life_width / 2, paddle.y, life_width, paddle.height],
+                [
+                    self.__game_x_to_resolution_x(mid - life_width / 2),
+                    self.__game_y_to_resolution_y(paddle.y),
+                    self.scaling * life_width,
+                    self.scaling * paddle.height,
+                ],
             )
 
     def __render_block(self, block: Block):
@@ -350,8 +355,10 @@ class Graphics:  # Does not yet support different resolutions
             pygame.draw.circle(
                 self.__screen,
                 Colors.negative(block.color),
-                (block.x + block.width / 2, block.y + block.height / 2),
-                block.height / 2,
+                self.__game_coords_to_resolution_coords(
+                    (block.x + block.width / 2, block.y + block.height / 2)
+                ),
+                self.scaling * block.height / 2,
             )
 
     def __render_ball(self, ball: Ball):
