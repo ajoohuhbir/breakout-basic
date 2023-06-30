@@ -58,3 +58,4 @@ X Ask about "backwards programming"
 X One "Data" class can suffice for settings, constants etc. Is this inheritance? Can I just use less classes?
 Awkwardness : Storing lives inside paddle
 Awkwardness : GameState reaching inside core game state to set ball velocity when launched
+Awkwardness : Isn’t “constants” doing too much “heavy lifting” rn?

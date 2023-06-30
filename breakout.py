@@ -54,8 +54,8 @@ class Constants:
     user_impulse_per_millisecond = 0.01
     update_repetitions = 50
     init_y_vel_ball = -0.8
-    init_max_x_vel_ball = 0.1
-    max_x_vel_ball = 0.2
+    init_max_x_vel_ball = 0.4
+    max_x_vel_ball = 0.8
     ball_radius = 5
     initial_lives = 3
     life_width = 5
@@ -628,22 +628,39 @@ class CoreGameState:
         return blocks
 
     def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
+        collision_type = None
         if (
             block.x - ball.radius < ball.x < block.x + block.width + ball.radius
             and block.y - ball.radius < ball.y < block.y + block.height + ball.radius
         ):
             if ball.y > block.y + block.height and ball.y_vel < 0:
-                ball.y_vel *= -1
+                collision_type = "vertical"
                 self.blocks.remove(block)
             elif ball.y < block.y and ball.y_vel > 0:
-                ball.y_vel *= -1
+                collision_type = "vertical"
                 self.blocks.remove(block)
             elif ball.x > block.x + block.width and ball.x_vel < 0:
-                ball.x_vel *= -1
+                collision_type = "horizontal"
                 self.blocks.remove(block)
             elif ball.x < block.x and ball.x_vel > 0:
-                ball.x_vel *= -1
+                collision_type = "horizontal"
                 self.blocks.remove(block)
+
+        if collision_type != None:
+            if ball.modifier == BallModifier.PIERCING:
+                if ball.piercing_counter > 0:
+                    ball.piercing_counter -= 1
+                else:
+                    ball.piercing_counter = ball.max_piercing_counter
+                    if collision_type == "vertical":
+                        ball.y_vel *= -1
+                    elif collision_type == "horizontal":
+                        ball.x_vel *= -1
+            else:
+                if collision_type == "vertical":
+                    ball.y_vel *= -1
+                elif collision_type == "horizontal":
+                    ball.x_vel *= -1
             return True  # This should flag the block sound to be played
 
     def __collision_check_ball_wall(self, ball: Ball):
