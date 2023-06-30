@@ -35,7 +35,7 @@ Ability to aim first launch, with some spread
 "Powerups," like temporary piercings, additional lives, etc.
 "Skills," like "last chance: revive if few enough blocks left" or "piercing on first shot"
 Saving progress
-Better UI
+Better UI and graphics
 
 SEPARATION ISSUES:
 X can't get color out of block
@@ -45,8 +45,10 @@ BUGS:
 X Flickering pause screen
     Fixed by rendering the pause screen only once, at the start, and only running input handling in the pause loop
 X Paddle collision wonky if on side
-For one frame, the paddle shows the ball on it even when no lives are left
-When starting from new_life, paddle collision sound is heard
+X For one frame, the paddle shows the ball on it even when no lives are left
+X When starting from new_life, paddle collision sound is heard
+Paddle movement wonky
+BIG BUG IN UPDATE BALL! CHANGING POSITION THROUGH VELOCITY DOESN'T INCORPORATE DELTA T!
 
 QUESTIONS:
 X Isn't rendering only the changing parts of a screen more "efficient"?

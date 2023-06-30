@@ -26,6 +26,10 @@ class Colors:
     def is_bright(cls, color: Color, brightness: int = 20) -> bool:
         return not [i < brightness for i in color] == [True, True, True]
 
+    @classmethod
+    def negative(cls, color: Color) -> Color:
+        return tuple([255 - i for i in color])
+
 
 @dataclass
 class GraphicsSettings:
@@ -45,16 +49,17 @@ class Constants:
 
     game_width = 800
     game_height = 600
-    gravity = 0.0002
+    gravity = 0.0004
     air_resistance_coefficient = 0.01
     user_impulse_per_millisecond = 0.01
     update_repetitions = 50
-    init_y_vel_ball = -0.28
-    init_max_x_vel_ball = 0.05
-    max_x_vel_ball = 0.1
+    init_y_vel_ball = -0.8
+    init_max_x_vel_ball = 0.1
+    max_x_vel_ball = 0.2
     ball_radius = 5
     initial_lives = 3
     life_width = 5
+    powerup_probability = 0.15
 
 
 class Sound(Enum):
@@ -151,6 +156,10 @@ class Paddle:
     lives: float
 
 
+class BallModifier(Enum):
+    PIERCING = "piercing"
+
+
 @dataclass
 class Ball:
     x: float
@@ -159,6 +168,29 @@ class Ball:
     y_vel: float
     radius: float
     has_fallen: bool = False
+    modifier: None | BallModifier = None  # This will later probably be a list
+    modifier_time: float = 0  # This will later probably be a list
+    max_piercing_counter = 0
+    piercing_counter: int = 0
+
+    def make_piercing(self, milliseconds, count):
+        self.modifier = BallModifier.PIERCING
+        self.modifier_time = milliseconds
+        self.max_piercing_counter = count
+        self.piercing_counter = count
+
+
+class BlockType(Enum):
+    NORMAL = "normal"
+    POWERUP = "powerup"
+
+    @classmethod
+    def normal_or_powerup(cls, probability_powerup):
+        return (
+            BlockType.POWERUP
+            if random.random() < probability_powerup
+            else BlockType.NORMAL
+        )
 
 
 @dataclass
@@ -167,6 +199,7 @@ class Block:
     y: float
     width: float
     height: float
+    block_type: BlockType
     color: Color
 
 
@@ -297,11 +330,18 @@ class Graphics:  # Does not yet support different resolutions
                 self.scaling * block.height,
             ],
         )
+        if block.block_type == BlockType.POWERUP:
+            pygame.draw.circle(
+                self.__screen,
+                Colors.negative(block.color),
+                (block.x + block.width / 2, block.y + block.height / 2),
+                block.height / 2,
+            )
 
     def __render_ball(self, ball: Ball):
         pygame.draw.circle(
             self.__screen,
-            self.__ball_color,
+            self.__ball_color if ball.modifier == None else Colors.red,
             (
                 self.__game_x_to_resolution_x(ball.x),
                 self.__game_y_to_resolution_y(ball.y),
@@ -551,6 +591,9 @@ class CoreGameState:
         else:
             impulse_sign = 0
 
+        if pygame.K_k in keys:
+            self.ball.make_piercing(3000, 1)
+
         self.paddle.x_vel += delta_t * (
             impulse_sign * Constants.user_impulse_per_millisecond
             - Constants.air_resistance_coefficient * self.paddle.x_vel
@@ -578,6 +621,7 @@ class CoreGameState:
                         50 * j + 2,
                         95,
                         45,
+                        BlockType.normal_or_powerup(Constants.powerup_probability),
                         Colors.generate_random_block_color(),
                     )
                 )
@@ -623,7 +667,7 @@ class CoreGameState:
         ):
             if ball.y <= paddle.y:
                 ball.y_vel *= -1
-                ball.x_vel += paddle.x_vel / 20
+                ball.x_vel += paddle.x_vel / 5
                 collision_occurred = True
             elif ball.y >= paddle.y and (
                 ball.x < paddle.x or ball.x > paddle.x + paddle.width
@@ -645,16 +689,20 @@ class CoreGameState:
             self.__new_life()
 
         else:
-            ball.y += ball.y_vel
-            ball.x += ball.x_vel
+            ball.y += ball.y_vel * delta_t
+            ball.x += ball.x_vel * delta_t
             if self.__collision_check_ball_paddle(ball, self.paddle):
                 output_sounds.append(Sound.HIT_SOUND)
-                if self.new_life:
-                    print("ahh", self.lives, self.ball.y_vel)
             self.__collision_check_ball_wall(ball)
             for block in self.blocks:
                 if self.__collision_check_ball_block(ball, block):
                     output_sounds.append(Sound.BLOCK_SOUND)
+
+            if ball.modifier == BallModifier.PIERCING:
+                ball.modifier_time -= delta_t
+                if ball.modifier_time <= 0:
+                    ball.modifier_time = 0
+                    ball.modifier = None
 
     def __new_life(self):
         self.paddle.lives = self.lives
