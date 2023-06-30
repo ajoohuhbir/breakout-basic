@@ -60,13 +60,15 @@ class Constants:
     initial_lives = 3
     life_width = 5
     powerup_probability = 0.15
+    powerup_fall_speed = 0.4
 
 
 class Sound(Enum):
-    START_SOUND = "start_sound"
-    HIT_SOUND = "hit_sound"
-    BLOCK_SOUND = "block_sound"
-    WIN_SOUND = "win_sound"
+    START = "start_sound"
+    HIT = "hit_sound"
+    BLOCK = "block_sound"
+    WIN = "win_sound"
+    POWERUP = "powerup_sound"
 
 
 class Music(Enum):
@@ -99,11 +101,13 @@ class Audio:
         hit_sound = pygame.mixer.Sound("paddle hit.mp3")
         block_sound = pygame.mixer.Sound("block hit.mp3")
         win_sound = pygame.mixer.Sound("win sound.wav")
+        powerup_sound = pygame.mixer.Sound("powerup sound.mp3")
         self.__to_sounds = {
-            Sound.START_SOUND: start_sound,
-            Sound.HIT_SOUND: hit_sound,
-            Sound.BLOCK_SOUND: block_sound,
-            Sound.WIN_SOUND: win_sound,
+            Sound.START: start_sound,
+            Sound.HIT: hit_sound,
+            Sound.BLOCK: block_sound,
+            Sound.WIN: win_sound,
+            Sound.POWERUP: powerup_sound,
         }
         self.__to_music = {
             Music.MENU: "menu.mp3",
@@ -203,7 +207,19 @@ class Block:
     color: Color
 
 
-GameObject = Block | Paddle | Ball
+class PowerupType(Enum):
+    PIERCING = "piercing"
+
+
+@dataclass
+class Powerup:
+    powerup_type: PowerupType
+    x: float
+    y: float
+    hitbox_radius: float
+
+
+GameObject = Block | Paddle | Ball | Powerup
 UIElement = SettingsSelector | Message
 
 
@@ -349,6 +365,27 @@ class Graphics:  # Does not yet support different resolutions
             self.scaling * ball.radius,
         )
 
+    def __render_powerup(self, powerup: Powerup):
+        pygame.draw.circle(
+            self.__screen,
+            Colors.red,
+            (
+                self.__game_x_to_resolution_x(powerup.x),
+                self.__game_y_to_resolution_y(powerup.y),
+            ),
+            self.scaling * powerup.hitbox_radius,
+            int(self.scaling * powerup.hitbox_radius / 4),
+        )
+        pygame.draw.circle(
+            self.__screen,
+            Colors.red,
+            (
+                self.__game_x_to_resolution_x(powerup.x),
+                self.__game_y_to_resolution_y(powerup.y),
+            ),
+            self.scaling * powerup.hitbox_radius / 4,
+        )
+
     def __render_object(self, obj: GameObject):
         if type(obj) == Block:
             self.__render_block(obj)
@@ -356,6 +393,8 @@ class Graphics:  # Does not yet support different resolutions
             self.__render_ball(obj)
         elif type(obj) == Paddle:
             self.__render_paddle(obj)
+        elif type(obj) == Powerup:
+            self.__render_powerup(obj)
 
     def __render_message(self, msg: Message):
         surf = pygame.font.SysFont(msg.font, round(self.scaling * msg.size)).render(
@@ -540,6 +579,7 @@ class CoreGameState:
         )
 
         self.blocks = self.__generate_blocks()
+        self.powerups = []
         self.new_life = False
 
     def update(
@@ -591,8 +631,8 @@ class CoreGameState:
         else:
             impulse_sign = 0
 
-        if pygame.K_k in keys:
-            self.ball.make_piercing(3000, 1)
+        # if pygame.K_k in keys:
+        #     self.ball.make_piercing(3000, 1)
 
         self.paddle.x_vel += delta_t * (
             impulse_sign * Constants.user_impulse_per_millisecond
@@ -608,8 +648,11 @@ class CoreGameState:
         if self.ball != None:
             self.__update_ball(self.ball, delta_t, output_sounds)
 
+        for powerup in self.powerups:
+            self.__update_powerup(powerup, delta_t, output_sounds)
+
     def __game_objects_to_render(self) -> list[GameObject]:
-        return [self.paddle] + [self.ball] + self.blocks
+        return [self.paddle] + [self.ball] + self.blocks + self.powerups
 
     def __generate_blocks(self) -> list[Block]:
         blocks = []
@@ -661,6 +704,16 @@ class CoreGameState:
                     ball.y_vel *= -1
                 elif collision_type == "horizontal":
                     ball.x_vel *= -1
+
+            if block.block_type == BlockType.POWERUP:
+                self.powerups.append(
+                    Powerup(
+                        PowerupType.PIERCING,
+                        block.x + block.width / 2,
+                        block.y + block.height / 2,
+                        block.height / 2,
+                    )
+                )
             return True  # This should flag the block sound to be played
 
     def __collision_check_ball_wall(self, ball: Ball):
@@ -694,6 +747,21 @@ class CoreGameState:
                 collision_occurred = True
         return collision_occurred  # This should flag the paddle sound to be played
 
+    def __collision_check_powerup_paddle(
+        self, powerup: Powerup, paddle: Paddle, ball: Ball
+    ):
+        if (
+            paddle.y - powerup.hitbox_radius
+            <= powerup.y
+            <= paddle.y + paddle.height + powerup.hitbox_radius
+            and paddle.x - powerup.hitbox_radius
+            <= powerup.x
+            <= paddle.x + paddle.width + powerup.hitbox_radius
+        ):
+            ball.make_piercing(3000, 1)
+            self.powerups.remove(powerup)
+            return True
+
     def __update_ball(self, ball: Ball, delta_t: float, output_sounds: list[Sound]):
         ball.y_vel += Constants.gravity * delta_t
         if ball.x_vel > 0.1:
@@ -709,17 +777,24 @@ class CoreGameState:
             ball.y += ball.y_vel * delta_t
             ball.x += ball.x_vel * delta_t
             if self.__collision_check_ball_paddle(ball, self.paddle):
-                output_sounds.append(Sound.HIT_SOUND)
+                output_sounds.append(Sound.HIT)
             self.__collision_check_ball_wall(ball)
             for block in self.blocks:
                 if self.__collision_check_ball_block(ball, block):
-                    output_sounds.append(Sound.BLOCK_SOUND)
+                    output_sounds.append(Sound.BLOCK)
 
             if ball.modifier == BallModifier.PIERCING:
                 ball.modifier_time -= delta_t
                 if ball.modifier_time <= 0:
                     ball.modifier_time = 0
                     ball.modifier = None
+
+    def __update_powerup(
+        self, powerup: Powerup, delta_t: float, output_sounds: list[Sound]
+    ):
+        powerup.y += delta_t * Constants.powerup_fall_speed
+        if self.__collision_check_powerup_paddle(powerup, self.paddle, self.ball):
+            output_sounds.append(Sound.POWERUP)
 
     def __new_life(self):
         self.paddle.lives = self.lives
@@ -944,7 +1019,7 @@ def state_transition_audio(
     sounds = []
     new_music = None
     if target_state == GameFsmState.GAME_WIN:
-        sounds.append(Sound.WIN_SOUND)
+        sounds.append(Sound.WIN)
         new_music = Music.VICTORY
     elif target_state == GameFsmState.GAME_OVER:
         new_music = Music.GAME_OVER
