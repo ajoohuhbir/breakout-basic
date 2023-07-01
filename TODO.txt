@@ -24,12 +24,21 @@ X Fix the paddle collision bug
 X Implement a Colours class
 X Implement "Press L to Launch"
 X Implement lives
+Resolution transformations improvements
+Make the collision checks pure functions
+Implement health powerup
+Block types - protector, healthier
+
+
+
+
 Fix hardcoding (settings screen, block generation, etc.)
 Fix screen_content being non-interactive
+    Use algebraic datatypes
 Make the damn music match
 
 POSSIBLE FUTURE FEATURES:
-Block "Health"
+X Block "Health"
 Block "Features," like "protects those around it", "heals those around it", "revives after some time", "Explodes and destroys nearby blocks if hit but only if hit before timer runs out"
 Ability to aim first launch, with some spread
 "Powerups," like temporary piercings, additional lives, etc.
@@ -48,7 +57,7 @@ X Paddle collision wonky if on side
 X For one frame, the paddle shows the ball on it even when no lives are left
 X When starting from new_life, paddle collision sound is heard
 X BIG BUG IN UPDATE BALL! CHANGING POSITION THROUGH VELOCITY DOESN'T INCORPORATE DELTA T!
-Lives and powerup block signs aren't resolution invariant
+X Lives and powerup block signs aren't resolution invariant
 Paddle movement wonky
 
 QUESTIONS:
@@ -57,6 +66,6 @@ X GameObjects inheritance
 X Should I use sets in the input handler? Is that better?
 X Ask about "backwards programming"
 X One "Data" class can suffice for settings, constants etc. Is this inheritance? Can I just use less classes?
-Awkwardness : Storing lives inside paddle
-Awkwardness : GameState reaching inside core game state to set ball velocity when launched
-Awkwardness : Isn’t “constants” doing too much “heavy lifting” rn?
+X Awkwardness : Storing lives inside paddle
+X Awkwardness : GameState reaching inside core game state to set ball velocity when launched
+X Awkwardness : Isn’t “constants” doing too much “heavy lifting” rn?

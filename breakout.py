@@ -15,19 +15,19 @@ class Colors:
     dark_gray = (10, 10, 10)
     red = (255, 0, 0)
 
-    @classmethod
-    def generate_random_block_color(cls) -> Color:
+    @staticmethod
+    def generate_random_block_color() -> Color:
         color = tuple([random.randint(0, 255) for i in range(3)])
         return (
             color if Colors.is_bright(color) else Colors.generate_random_block_color()
         )
 
-    @classmethod
-    def is_bright(cls, color: Color, brightness: int = 20) -> bool:
+    @staticmethod
+    def is_bright(color: Color, brightness: int = 20) -> bool:
         return not [i < brightness for i in color] == [True, True, True]
 
-    @classmethod
-    def negative(cls, color: Color) -> Color:
+    @staticmethod
+    def negative(color: Color) -> Color:
         return tuple([255 - i for i in color])
 
 
@@ -59,7 +59,7 @@ class Constants:
     ball_radius = 5
     initial_lives = 3
     life_width = 5
-    powerup_probability = 0.15
+    powerup_probability = 0.2
     powerup_fall_speed = 0.4
 
 
@@ -173,15 +173,15 @@ class Ball:
     radius: float
     has_fallen: bool = False
     modifier: None | BallModifier = None  # This will later probably be a list
-    modifier_time: float = 0  # This will later probably be a list
-    max_piercing_counter = 0
-    piercing_counter: int = 0
+    modifier_active_for: float = 0  # This will later probably be a list
+    max_blocks_can_pierce: int = 0
+    blocks_pierced: int = 0
 
     def make_piercing(self, milliseconds, count):
         self.modifier = BallModifier.PIERCING
-        self.modifier_time = milliseconds
-        self.max_piercing_counter = count
-        self.piercing_counter = count
+        self.modifier_active_for = milliseconds
+        self.max_blocks_can_pierce = count
+        self.blocks_pierced = count
 
 
 class BlockType(Enum):
@@ -299,15 +299,8 @@ class Graphics:  # Does not yet support different resolutions
         self.__set_game_screen()
 
     def __render_paddle(self, paddle: Paddle):
-        pygame.draw.rect(
-            self.__screen,
-            (self.__paddle_color),
-            [
-                self.__game_x_to_resolution_x(paddle.x),
-                self.__game_y_to_resolution_y(paddle.y),
-                self.scaling * paddle.width,
-                self.scaling * paddle.height,
-            ],
+        self.__res_draw_rect(
+            paddle.x, paddle.y, paddle.width, paddle.height, self.__paddle_color
         )
         self.__render_lives(paddle)
 
@@ -329,68 +322,41 @@ class Graphics:  # Does not yet support different resolutions
         actual_mids = [paddle.x + paddle.width * i for i in mids]
 
         for mid in actual_mids:
-            pygame.draw.rect(
-                self.__screen,
-                Colors.red,
-                [
-                    self.__game_x_to_resolution_x(mid - life_width / 2),
-                    self.__game_y_to_resolution_y(paddle.y),
-                    self.scaling * life_width,
-                    self.scaling * paddle.height,
-                ],
+            self.__res_draw_rect(
+                mid - life_width / 2, paddle.y, life_width, paddle.height, Colors.red
             )
 
     def __render_block(self, block: Block):
-        pygame.draw.rect(
-            self.__screen,
-            block.color,
-            [
-                self.__game_x_to_resolution_x(block.x),
-                self.__game_y_to_resolution_y(block.y),
-                self.scaling * block.width,
-                self.scaling * block.height,
-            ],
-        )
+        self.__res_draw_rect(block.x, block.y, block.width, block.height, block.color)
         if block.block_type == BlockType.POWERUP:
-            pygame.draw.circle(
-                self.__screen,
+            self.__res_draw_circle(
+                block.x + block.width / 2,
+                block.y + block.height / 2,
+                block.height / 2,
                 Colors.negative(block.color),
-                self.__game_coords_to_resolution_coords(
-                    (block.x + block.width / 2, block.y + block.height / 2)
-                ),
-                self.scaling * block.height / 2,
             )
 
     def __render_ball(self, ball: Ball):
-        pygame.draw.circle(
-            self.__screen,
+        self.__res_draw_circle(
+            ball.x,
+            ball.y,
+            ball.radius,
             self.__ball_color if ball.modifier == None else Colors.red,
-            (
-                self.__game_x_to_resolution_x(ball.x),
-                self.__game_y_to_resolution_y(ball.y),
-            ),
-            self.scaling * ball.radius,
         )
 
     def __render_powerup(self, powerup: Powerup):
-        pygame.draw.circle(
-            self.__screen,
+        self.__res_draw_circle(
+            powerup.x,
+            powerup.y,
+            powerup.hitbox_radius,
             Colors.red,
-            (
-                self.__game_x_to_resolution_x(powerup.x),
-                self.__game_y_to_resolution_y(powerup.y),
-            ),
-            self.scaling * powerup.hitbox_radius,
-            int(self.scaling * powerup.hitbox_radius / 4),
+            powerup.hitbox_radius / 4,
         )
-        pygame.draw.circle(
-            self.__screen,
+        self.__res_draw_circle(
+            powerup.x,
+            powerup.y,
+            powerup.hitbox_radius / 4,
             Colors.red,
-            (
-                self.__game_x_to_resolution_x(powerup.x),
-                self.__game_y_to_resolution_y(powerup.y),
-            ),
-            self.scaling * powerup.hitbox_radius / 4,
         )
 
     def __render_object(self, obj: GameObject):
@@ -457,15 +423,8 @@ class Graphics:  # Does not yet support different resolutions
             second_triangle_point_b,
         ]
 
-        first_triangle_resoshifted = [
-            self.__game_coords_to_resolution_coords(i) for i in first_triangle
-        ]
-        second_triangle_resoshifted = [
-            self.__game_coords_to_resolution_coords(i) for i in second_triangle
-        ]
-
-        pygame.draw.polygon(self.__screen, (255, 255, 255), first_triangle_resoshifted)
-        pygame.draw.polygon(self.__screen, (255, 255, 255), second_triangle_resoshifted)
+        self.__res_draw_polygon(first_triangle, Colors.white)
+        self.__res_draw_polygon(second_triangle, Colors.white)
 
     def __render_ui_element(self, ui_element: UIElement):
         if type(ui_element) == Message:
@@ -521,6 +480,32 @@ class Graphics:  # Does not yet support different resolutions
         x = coord[0]
         y = coord[1]
         return (self.__game_x_to_resolution_x(x), self.__game_y_to_resolution_y(y))
+
+    def __res_draw_rect(self, x, y, width, height, color, border_width=0):
+        pygame.draw.rect(
+            self.__screen,
+            color,
+            [
+                self.__game_x_to_resolution_x(x),
+                self.__game_y_to_resolution_y(y),
+                self.scaling * width,
+                self.scaling * height,
+            ],
+            int(self.scaling * border_width),
+        )
+
+    def __res_draw_circle(self, x, y, radius, color, border_width=0):
+        pygame.draw.circle(
+            self.__screen,
+            color,
+            self.__game_coords_to_resolution_coords((x, y)),
+            self.scaling * radius,
+            int(self.scaling * border_width),
+        )
+
+    def __res_draw_polygon(self, points, color):
+        points = [self.__game_coords_to_resolution_coords(i) for i in points]
+        pygame.draw.polygon(self.__screen, color, points)
 
 
 class KeyboardState:
@@ -638,9 +623,6 @@ class CoreGameState:
         else:
             impulse_sign = 0
 
-        # if pygame.K_k in keys:
-        #     self.ball.make_piercing(3000, 1)
-
         self.paddle.x_vel += delta_t * (
             impulse_sign * Constants.user_impulse_per_millisecond
             - Constants.air_resistance_coefficient * self.paddle.x_vel
@@ -698,10 +680,10 @@ class CoreGameState:
 
         if collision_type != None:
             if ball.modifier == BallModifier.PIERCING:
-                if ball.piercing_counter > 0:
-                    ball.piercing_counter -= 1
+                if ball.blocks_pierced < ball.max_blocks_can_pierce:
+                    ball.blocks_pierced += 1
                 else:
-                    ball.piercing_counter = ball.max_piercing_counter
+                    ball.blocks_pierced = 0
                     if collision_type == "vertical":
                         ball.y_vel *= -1
                     elif collision_type == "horizontal":
@@ -754,9 +736,7 @@ class CoreGameState:
                 collision_occurred = True
         return collision_occurred  # This should flag the paddle sound to be played
 
-    def __collision_check_powerup_paddle(
-        self, powerup: Powerup, paddle: Paddle, ball: Ball
-    ):
+    def __collision_check_powerup_paddle(self, powerup: Powerup, paddle: Paddle):
         if (
             paddle.y - powerup.hitbox_radius
             <= powerup.y
@@ -765,7 +745,6 @@ class CoreGameState:
             <= powerup.x
             <= paddle.x + paddle.width + powerup.hitbox_radius
         ):
-            ball.make_piercing(3000, 1)
             self.powerups.remove(powerup)
             return True
 
@@ -791,17 +770,18 @@ class CoreGameState:
                     output_sounds.append(Sound.BLOCK)
 
             if ball.modifier == BallModifier.PIERCING:
-                ball.modifier_time -= delta_t
-                if ball.modifier_time <= 0:
-                    ball.modifier_time = 0
+                ball.modifier_active_for -= delta_t
+                if ball.modifier_active_for <= 0:
+                    ball.modifier_active_for = 0
                     ball.modifier = None
 
     def __update_powerup(
         self, powerup: Powerup, delta_t: float, output_sounds: list[Sound]
     ):
         powerup.y += delta_t * Constants.powerup_fall_speed
-        if self.__collision_check_powerup_paddle(powerup, self.paddle, self.ball):
+        if self.__collision_check_powerup_paddle(powerup, self.paddle):
             output_sounds.append(Sound.POWERUP)
+            self.ball.make_piercing(3000, 1)
 
     def __new_life(self):
         self.paddle.lives = self.lives
