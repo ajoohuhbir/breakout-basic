@@ -38,7 +38,7 @@ Fix screen_content being non-interactive
 Make the damn music match
 
 POSSIBLE FUTURE FEATURES:
-X Block "Health"
+Block "Health"
 Block "Features," like "protects those around it", "heals those around it", "revives after some time", "Explodes and destroys nearby blocks if hit but only if hit before timer runs out"
 Ability to aim first launch, with some spread
 "Powerups," like temporary piercings, additional lives, etc.
@@ -60,6 +60,7 @@ X BIG BUG IN UPDATE BALL! CHANGING POSITION THROUGH VELOCITY DOESN'T INCORPORATE
 X Lives and powerup block signs aren't resolution invariant
 Paddle movement wonky
 Piercing is latent and sometimes doesn't work
+    I suspect this is because wall collisions don't reset blocks_pierced
 
 QUESTIONS:
 X Isn't rendering only the changing parts of a screen more "efficient"?

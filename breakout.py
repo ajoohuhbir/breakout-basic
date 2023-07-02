@@ -184,12 +184,13 @@ class Ball:
         self.modifier = BallModifier.PIERCING
         self.modifier_active_for = milliseconds
         self.max_blocks_can_pierce = count
-        self.blocks_pierced = count
+        self.blocks_pierced = 0
 
 
 class BlockType(Enum):
     NORMAL = "normal"
     POWERUP = "powerup"
+    PROTECTOR = "protector"
 
     @classmethod
     def normal_or_powerup(cls, probability_powerup):
@@ -206,7 +207,11 @@ class Block:
     y: float
     width: float
     height: float
+    block_id: Tuple[int, int]
     block_type: BlockType
+    health: int
+    protection: int
+
     color: Color
 
 
@@ -338,6 +343,29 @@ class Graphics:  # Does not yet support different resolutions
                 block.y + block.height / 2,
                 block.height / 2,
                 Colors.negative(block.color),
+            )
+        elif block.block_type == BlockType.PROTECTOR:
+            self.__res_draw_rect(
+                block.x, block.y, block.width, block.height, Colors.white
+            )
+        if block.health > 1:
+            self.__res_draw_rect(
+                block.x,
+                block.y,
+                block.width,
+                block.height,
+                Colors.red,
+                int((block.health - 1) * block.height / 10),
+            )
+
+        if block.protection > 0:
+            self.__res_draw_rect(
+                block.x,
+                block.y,
+                block.width,
+                block.height,
+                Colors.white,
+                int(block.height / 5),
             )
 
     def __render_ball(self, ball: Ball):
@@ -606,6 +634,8 @@ class CoreGameState:
         )
 
         self.blocks = self.__generate_blocks()
+        self.__set_special_blocks()
+        self.__update_block_effects()
         self.powerups = []
         self.new_life = False
 
@@ -678,6 +708,13 @@ class CoreGameState:
     def __game_objects_to_render(self) -> list[GameObject]:
         return [self.paddle] + [self.ball] + self.blocks + self.powerups
 
+    def __get_block_from_id(self, id: Tuple[int, int]) -> Block | None:
+        for block in self.blocks:
+            if block.block_id == id:
+                return block
+
+        return None
+
     def __generate_blocks(self) -> list[Block]:
         blocks = []
         for i in range(8):
@@ -688,11 +725,26 @@ class CoreGameState:
                         50 * j + 2,
                         95,
                         45,
-                        BlockType.normal_or_powerup(Constants.powerup_probability),
+                        (i, j),
+                        BlockType.NORMAL,
+                        1,
+                        0,
                         Colors.generate_random_block_color(),
                     )
                 )
+
         return blocks
+
+    def __set_special_blocks(self):
+        for block in self.blocks:
+            block.block_type = BlockType.normal_or_powerup(
+                Constants.powerup_probability
+            )
+
+            if block.block_id[1] in [0, 2]:
+                block.health += 1
+            if block.block_id in [(2, 2), (5, 2)]:
+                block.block_type = BlockType.PROTECTOR
 
     def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
         collision_type = None
@@ -702,20 +754,18 @@ class CoreGameState:
         ):
             if ball.y > block.y + block.height and ball.y_vel < 0:
                 collision_type = "vertical"
-                self.blocks.remove(block)
             elif ball.y < block.y and ball.y_vel > 0:
                 collision_type = "vertical"
-                self.blocks.remove(block)
             elif ball.x > block.x + block.width and ball.x_vel < 0:
                 collision_type = "horizontal"
-                self.blocks.remove(block)
             elif ball.x < block.x and ball.x_vel > 0:
                 collision_type = "horizontal"
-                self.blocks.remove(block)
 
         if collision_type != None:
             if ball.modifier == BallModifier.PIERCING:
-                if ball.blocks_pierced < ball.max_blocks_can_pierce:
+                if (ball.blocks_pierced < ball.max_blocks_can_pierce) and (
+                    block.health <= 1 or block.protection <= 0
+                ):
                     ball.blocks_pierced += 1
                 else:
                     ball.blocks_pierced = 0
@@ -723,18 +773,12 @@ class CoreGameState:
                         ball.y_vel *= -1
                     elif collision_type == "horizontal":
                         ball.x_vel *= -1
+
             else:
                 if collision_type == "vertical":
                     ball.y_vel *= -1
                 elif collision_type == "horizontal":
                     ball.x_vel *= -1
-
-            if block.block_type == BlockType.POWERUP:
-                self.__spawn_powerup(
-                    block.x + block.width / 2,
-                    block.y + block.height / 2,
-                    block.height / 2,
-                )
 
             return True  # This should flag the block sound to be played
 
@@ -781,6 +825,35 @@ class CoreGameState:
             self.powerups.remove(powerup)
             return True
 
+    def __update_block_from_collision(self, block: Block, output_sounds: list[Sound]):
+        if block.protection == 0:
+            block.health -= 1
+
+        if block.health <= 0:
+            self.__break_block(block)
+            output_sounds.append(Sound.BLOCK)
+            self.__update_block_effects()
+
+    def __update_block_effects(self):  # Awkward?
+        for block in self.blocks:
+            block.protection = 0
+
+        for block in self.blocks:
+            if block.block_type == BlockType.PROTECTOR:
+                i, j = block.block_id
+                self.__get_block_from_id((i, j + 1)).protection += 1
+                self.__get_block_from_id((i - 1, j + 1)).protection += 1
+                self.__get_block_from_id((i + 1, j + 1)).protection += 1
+
+    def __break_block(self, block: Block):
+        if block.block_type == BlockType.POWERUP:
+            self.__spawn_powerup(
+                block.x + block.width / 2,
+                block.y + block.height / 2,
+                block.height / 2,
+            )
+        self.blocks.remove(block)
+
     def __update_ball(self, ball: Ball, delta_t: float, output_sounds: list[Sound]):
         ball.y_vel += Constants.gravity * delta_t
         if ball.x_vel > 0.1:
@@ -800,7 +873,7 @@ class CoreGameState:
             self.__collision_check_ball_wall(ball)
             for block in self.blocks:
                 if self.__collision_check_ball_block(ball, block):
-                    output_sounds.append(Sound.BLOCK)
+                    self.__update_block_from_collision(block, output_sounds)
 
             if ball.modifier == BallModifier.PIERCING:
                 ball.modifier_active_for -= delta_t
