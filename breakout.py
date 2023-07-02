@@ -743,7 +743,7 @@ class CoreGameState:
 
             if block.block_id[1] in [0, 2]:
                 block.health += 1
-            if block.block_id in [(2, 2), (5, 2)]:
+            if block.block_id in [(3, 1), (4, 1)]:
                 block.block_type = BlockType.PROTECTOR
 
     def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
