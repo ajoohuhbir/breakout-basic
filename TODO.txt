@@ -59,6 +59,7 @@ X When starting from new_life, paddle collision sound is heard
 X BIG BUG IN UPDATE BALL! CHANGING POSITION THROUGH VELOCITY DOESN'T INCORPORATE DELTA T!
 X Lives and powerup block signs aren't resolution invariant
 Paddle movement wonky
+Piercing is latent and sometimes doesn't work
 
 QUESTIONS:
 X Isn't rendering only the changing parts of a screen more "efficient"?

@@ -2,9 +2,9 @@ import pygame
 import random
 from enum import Enum
 from dataclasses import dataclass
-import dataclasses
 from typing import Tuple
 import copy
+import math
 
 Color = Tuple[float, float, float]
 
@@ -59,7 +59,10 @@ class Constants:
     ball_radius = 5
     initial_lives = 3
     life_width = 5
-    powerup_probability = 0.2
+
+    powerup_probability = 0.4
+    powerup_type_probabilities = [0.8, 0.2]
+    assert round(sum(powerup_type_probabilities), 3) == 1.0
     powerup_fall_speed = 0.4
 
 
@@ -209,6 +212,7 @@ class Block:
 
 class PowerupType(Enum):
     PIERCING = "piercing"
+    LIFE = "life"
 
 
 @dataclass
@@ -345,6 +349,12 @@ class Graphics:  # Does not yet support different resolutions
         )
 
     def __render_powerup(self, powerup: Powerup):
+        if powerup.powerup_type == PowerupType.PIERCING:
+            self.__render_piercing_powerup(powerup)
+        elif powerup.powerup_type == PowerupType.LIFE:
+            self.__render_life_powerup(powerup)
+
+    def __render_piercing_powerup(self, powerup: Powerup):
         self.__res_draw_circle(
             powerup.x,
             powerup.y,
@@ -358,6 +368,31 @@ class Graphics:  # Does not yet support different resolutions
             powerup.hitbox_radius / 4,
             Colors.red,
         )
+
+    def __render_life_powerup(self, powerup: Powerup):
+        get_circle_point = lambda theta_deg: (
+            powerup.x + powerup.hitbox_radius / 2 * math.cos(math.radians(theta_deg)),
+            powerup.y - powerup.hitbox_radius / 2 * math.sin(math.radians(theta_deg)),
+        )
+
+        heart_points = [
+            get_circle_point(45),
+            get_circle_point(0),
+            get_circle_point(270),
+            get_circle_point(180),
+            get_circle_point(135),
+            (powerup.x, powerup.y),
+        ]
+
+        self.__res_draw_circle(
+            powerup.x,
+            powerup.y,
+            powerup.hitbox_radius,
+            Colors.red,
+            powerup.hitbox_radius / 4,
+        )
+
+        self.__res_draw_polygon(heart_points, Colors.red)
 
     def __render_object(self, obj: GameObject):
         if type(obj) == Block:
@@ -695,14 +730,12 @@ class CoreGameState:
                     ball.x_vel *= -1
 
             if block.block_type == BlockType.POWERUP:
-                self.powerups.append(
-                    Powerup(
-                        PowerupType.PIERCING,
-                        block.x + block.width / 2,
-                        block.y + block.height / 2,
-                        block.height / 2,
-                    )
+                self.__spawn_powerup(
+                    block.x + block.width / 2,
+                    block.y + block.height / 2,
+                    block.height / 2,
                 )
+
             return True  # This should flag the block sound to be played
 
     def __collision_check_ball_wall(self, ball: Ball):
@@ -775,13 +808,23 @@ class CoreGameState:
                     ball.modifier_active_for = 0
                     ball.modifier = None
 
+    def __spawn_powerup(self, x, y, hitbox_radius):
+        ptype = random.choices(list(PowerupType), Constants.powerup_type_probabilities)[
+            0
+        ]
+        self.powerups.append(Powerup(ptype, x, y, hitbox_radius))
+
     def __update_powerup(
         self, powerup: Powerup, delta_t: float, output_sounds: list[Sound]
     ):
         powerup.y += delta_t * Constants.powerup_fall_speed
         if self.__collision_check_powerup_paddle(powerup, self.paddle):
             output_sounds.append(Sound.POWERUP)
-            self.ball.make_piercing(3000, 1)
+            if powerup.powerup_type == PowerupType.PIERCING:
+                self.ball.make_piercing(3000, 1)
+            elif powerup.powerup_type == PowerupType.LIFE:
+                self.lives += 1
+                self.paddle.lives += 1
 
     def __new_life(self):
         self.paddle.lives = self.lives
@@ -1010,9 +1053,6 @@ def state_transition_audio(
         new_music = Music.VICTORY
     elif target_state == GameFsmState.GAME_OVER:
         new_music = Music.GAME_OVER
-    # elif target_state == GameFsmState.PLAY:
-    #     if current_state == GameFsmState.PRE_PLAY:
-    #         new_music = Music.GAME_PLAY
     elif target_state == GameFsmState.PRE_PLAY and current_state != GameFsmState.PLAY:
         new_music = Music.GAME_PLAY
     return AudioInstructions(sounds, new_music)
