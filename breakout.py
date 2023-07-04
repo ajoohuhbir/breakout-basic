@@ -633,7 +633,7 @@ class CoreGameState:
             Constants.ball_radius,
         )
 
-        self.blocks = self.__generate_blocks()
+        self.blocks = self.__generate_blocks(9, 5)
         self.__set_special_blocks()
         self.__update_block_effects()
         self.powerups = []
@@ -715,16 +715,17 @@ class CoreGameState:
 
         return None
 
-    def __generate_blocks(self) -> list[Block]:
+    def __generate_blocks(self, num_cols, num_rows) -> list[Block]:
         blocks = []
-        for i in range(8):
-            for j in range(4):
+        gap = 2
+        for i in range(num_cols):
+            for j in range(num_rows):
                 blocks.append(
                     Block(
-                        100 * i + 2,
-                        50 * j + 2,
-                        95,
-                        45,
+                        (Constants.game_width / num_cols) * i + gap,
+                        (Constants.game_height / (3 * num_rows)) * j + gap,
+                        (Constants.game_width / num_cols) - 2 * gap,
+                        (Constants.game_height / (3 * num_rows)) - 2 * gap,
                         (i, j),
                         BlockType.NORMAL,
                         1,
@@ -743,7 +744,7 @@ class CoreGameState:
 
             if block.block_id[1] in [0, 2]:
                 block.health += 1
-            if block.block_id in [(3, 1), (4, 1)]:
+            if block.block_id in [(4, 2)]:
                 block.block_type = BlockType.PROTECTOR
 
     def __collision_check_ball_block(self, ball: Ball, block: Block) -> bool:
