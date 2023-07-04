@@ -45,6 +45,7 @@ Ability to aim first launch, with some spread
 "Skills," like "last chance: revive if few enough blocks left" or "piercing on first shot"
 Saving progress
 Better UI and graphics
+Endless mode
 
 SEPARATION ISSUES:
 X can't get color out of block
