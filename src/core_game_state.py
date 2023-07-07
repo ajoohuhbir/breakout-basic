@@ -4,87 +4,20 @@ import random
 from typing import Tuple
 import pygame
 
-from Context import Color, Colors, GameFsmState
-from Settings import Constants
-from Audio import Sound
-
-
-@dataclass
-class Paddle:
-    x: float
-    y: float
-    width: float
-    height: float
-    x_vel: float
-    lives: float
-
-
-class BallModifier(Enum):
-    PIERCING = "piercing"
-
-
-@dataclass
-class Ball:
-    x: float
-    y: float
-    x_vel: float
-    y_vel: float
-    radius: float
-    has_fallen: bool = False
-    modifier: None | BallModifier = None  # This will later probably be a list
-    modifier_active_for: float = 0  # This will later probably be a list
-    max_blocks_can_pierce: int = 0
-    blocks_pierced: int = 0
-
-    def make_piercing(self, milliseconds, count):
-        self.modifier = BallModifier.PIERCING
-        self.modifier_active_for = milliseconds
-        self.max_blocks_can_pierce = count
-        self.blocks_pierced = 0
-
-
-class BlockType(Enum):
-    NORMAL = "normal"
-    POWERUP = "powerup"
-    PROTECTOR = "protector"
-
-    @classmethod
-    def normal_or_powerup(cls, probability_powerup):
-        return (
-            BlockType.POWERUP
-            if random.random() < probability_powerup
-            else BlockType.NORMAL
-        )
-
-
-@dataclass
-class Block:
-    x: float
-    y: float
-    width: float
-    height: float
-    block_id: Tuple[int, int]
-    block_type: BlockType
-    health: int
-    protection: int
-
-    color: Color
-
-
-class PowerupType(Enum):
-    PIERCING = "piercing"
-    LIFE = "life"
-
-
-@dataclass
-class Powerup:
-    powerup_type: PowerupType
-    x: float
-    y: float
-    hitbox_radius: float
-
-
-GameObject = Block | Paddle | Powerup | Ball
+from common import (
+    Colors,
+    Constants,
+    Block,
+    Paddle,
+    Ball,
+    GameFsmState,
+    BallModifier,
+    BlockType,
+    PowerupType,
+    Powerup,
+    GameObject,
+)
+from audio import Sound
 
 
 class CoreGameState:

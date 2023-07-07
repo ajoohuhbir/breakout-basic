@@ -4,9 +4,11 @@ import copy
 import math
 from typing import Tuple
 
-from Context import Color, Colors
-from Settings import GraphicsSettings, SettingsSelector, Constants
-from CoreGameState import (
+from settings import SettingsSelector
+from common import (
+    Color,
+    Colors,
+    Constants,
     GameObject,
     Paddle,
     Ball,
@@ -14,6 +16,7 @@ from CoreGameState import (
     Powerup,
     BlockType,
     PowerupType,
+    GraphicsSettings,
 )
 
 

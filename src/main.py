@@ -1,10 +1,10 @@
 import pygame
 
 
-from GameState import GameState
-from Graphics import Graphics
-from Audio import Audio
-from Inputs import KeyboardState
+from game_state import GameState
+from graphics import Graphics
+from audio import Audio
+from inputs import KeyboardState
 
 
 def check_invariants(game: GameState, graphics: Graphics):

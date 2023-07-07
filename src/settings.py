@@ -3,19 +3,8 @@ import pygame
 import copy
 from typing import Tuple
 
-from Inputs import KeyboardState
-
-
-@dataclass
-class GraphicsSettings:
-    resolution_width: int
-    resolution_height: int
-
-
-@dataclass
-class Settings:
-    fps: int
-    graphics_settings: GraphicsSettings
+from common import Settings, Constants
+from inputs import KeyboardState
 
 
 @dataclass
@@ -23,29 +12,6 @@ class SettingsSelector:
     x: float
     y: float
     width: int
-
-
-class Constants:
-    default_graphics_settings = GraphicsSettings(800, 600)
-    default_settings = Settings(60, default_graphics_settings)
-
-    game_width = 800
-    game_height = 600
-    gravity = 0.0004
-    air_resistance_coefficient = 0.01
-    user_impulse_per_millisecond = 0.01
-    update_repetitions = 50
-    init_y_vel_ball = -0.8
-    init_max_x_vel_ball = 0.4
-    max_x_vel_ball = 0.8
-    ball_radius = 5
-    initial_lives = 3
-    life_width = 5
-
-    powerup_probability = 0.4
-    powerup_type_probabilities = [0.8, 0.2]
-    assert round(sum(powerup_type_probabilities), 3) == 1.0
-    powerup_fall_speed = 0.4
 
 
 class SettingsState:

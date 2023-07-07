@@ -3,13 +3,13 @@ from typing import Tuple
 import copy
 import pygame
 
-from Context import GameFsmState
-from Settings import SettingsState, Constants
-from Audio import AudioInstructions, Music, Sound
-from Graphics import GraphicsInstructions
-from Inputs import KeyboardState
-from CoreGameState import CoreGameState
-from ScreenContent import screen_content
+from common import GameFsmState, Constants
+from settings import SettingsState
+from audio import AudioInstructions, Music, Sound
+from graphics import GraphicsInstructions
+from inputs import KeyboardState
+from core_game_state import CoreGameState
+from screen_content import screen_content
 
 
 class GameState:

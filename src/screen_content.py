@@ -1,6 +1,6 @@
-from Context import GameFsmState
-from Graphics import Message
-from Settings import SettingsState, Constants
+from common import GameFsmState, Constants
+from graphics import Message
+from settings import SettingsState
 
 
 def screen_content(

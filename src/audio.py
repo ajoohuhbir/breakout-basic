@@ -12,11 +12,11 @@ class Sound(Enum):
 
 
 class Music(Enum):
-    MENU = "menu.mp3"
-    GAME_OVER = "game over.mp3"
-    GAME_PLAY = "music.mp3"
-    VICTORY = "win music.mp3"
-    PRE_LAUNCH_UNIMPLEMENTED = "pre-launch.mp3"
+    MENU = "audio_files/menu.mp3"
+    GAME_OVER = "audio_files/game over.mp3"
+    GAME_PLAY = "audio_files/music.mp3"
+    VICTORY = "audio_files/win music.mp3"
+    PRE_LAUNCH_UNIMPLEMENTED = "audio_files/pre-launch.mp3"
 
 
 @dataclass
@@ -37,11 +37,11 @@ class AudioInstructions:
 
 class Audio:
     def __init__(self):
-        start_sound = pygame.mixer.Sound("start effect.mp3")
-        hit_sound = pygame.mixer.Sound("paddle hit.mp3")
-        block_sound = pygame.mixer.Sound("block hit.mp3")
-        win_sound = pygame.mixer.Sound("win sound.wav")
-        powerup_sound = pygame.mixer.Sound("powerup sound.mp3")
+        start_sound = pygame.mixer.Sound("audio_files/start effect.mp3")
+        hit_sound = pygame.mixer.Sound("audio_files/paddle hit.mp3")
+        block_sound = pygame.mixer.Sound("audio_files/block hit.mp3")
+        win_sound = pygame.mixer.Sound("audio_files/win sound.wav")
+        powerup_sound = pygame.mixer.Sound("audio_files/powerup sound.mp3")
         self.__to_sounds = {
             Sound.START: start_sound,
             Sound.HIT: hit_sound,
@@ -50,11 +50,11 @@ class Audio:
             Sound.POWERUP: powerup_sound,
         }
         self.__to_music = {
-            Music.MENU: "menu.mp3",
-            Music.GAME_OVER: "game over.mp3",
-            Music.GAME_PLAY: "music.mp3",
-            Music.VICTORY: "win music.mp3",
-            Music.PRE_LAUNCH_UNIMPLEMENTED: "pre-launch.mp3",
+            Music.MENU: "audio_files/menu.mp3",
+            Music.GAME_OVER: "audio_files/game over.mp3",
+            Music.GAME_PLAY: "audio_files/music.mp3",
+            Music.VICTORY: "audio_files/win music.mp3",
+            Music.PRE_LAUNCH_UNIMPLEMENTED: "audio_files/pre-launch.mp3",
         }
         self.__player = pygame.mixer.music
         self.__player.load(self.__to_music[Music.MENU])
