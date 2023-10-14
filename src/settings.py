@@ -6,6 +6,7 @@ from typing import Tuple
 from common import Settings, Constants
 from inputs import KeyboardState
 
+# This module deals with the settings screen
 
 @dataclass
 class SettingsSelector:
@@ -17,12 +18,17 @@ class SettingsSelector:
 class SettingsState:
     possible_settings = ["Resolution", "FPS"]
     possible_resolutions = [(800, 600), (1080, 720), (400, 300)]
+    
+    # how wide the selector needs be for each setting
+    # this is a temporary solution because there aren't too many settings right now
+    # if I add lots more settings all this information will probably be wrapped in an object
+    selector_width_for_each_setting = [600, 400]        
 
     def __init__(self, settings: Settings):
         self.changed = False
         self.selector_at = 1
         self.selector = SettingsSelector(
-            Constants.game_width / 2, 0.4 * Constants.game_height, 400
+            Constants.game_width / 2, 0.4 * Constants.game_height, self.selector_width_for_each_setting[self.selector_at]
         )
         self.temp_fps = settings.fps
         self.temp_resolution = SettingsState.possible_resolutions.index(
@@ -42,9 +48,11 @@ class SettingsState:
         if pygame.K_s in keys and not self.changed:
             self.selector_at += 1
             self.selector_at %= len(SettingsState.possible_settings)
+            self.selector.width = self.selector_width_for_each_setting[self.selector_at]
         elif pygame.K_w in keys and not self.changed:
             self.selector_at -= 1
             self.selector_at %= len(SettingsState.possible_settings)
+            self.selector.width = self.selector_width_for_each_setting[self.selector_at]
         elif pygame.K_d in keys:
             if self.selector_at == 0:
                 self.temp_resolution += 1

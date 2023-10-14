@@ -3,9 +3,12 @@ import random
 from enum import Enum
 from dataclasses import dataclass
 
+# This module contains the classes that are common to most other modules
+
+# A type alias for cleaner code
 Color = Tuple[float, float, float]
 
-
+# A class to hold utility information and methods about colors
 class Colors:
     white = (255, 255, 255)
     black = (0, 0, 0)
@@ -19,6 +22,8 @@ class Colors:
             color if Colors.is_bright(color) else Colors.generate_random_block_color()
         )
 
+    # Checks if a color is bright enough
+    # Block colors should be bright enough to distinguish them from the background
     @staticmethod
     def is_bright(color: Color, brightness: int = 20) -> bool:
         return not [i < brightness for i in color] == [True, True, True]
@@ -27,7 +32,7 @@ class Colors:
     def negative(color: Color) -> Color:
         return tuple([255 - i for i in color])
 
-
+# Possible states of the game_state FSM
 class GameFsmState(Enum):
     MENU = "menu"
     PLAY = "play"
@@ -39,13 +44,12 @@ class GameFsmState(Enum):
     SETTINGS = "settings"
     PRE_PLAY = "pre play"
 
-
 @dataclass
 class GraphicsSettings:
     resolution_width: int
     resolution_height: int
 
-
+# Holds the settings for the game
 @dataclass
 class Settings:
     fps: int
@@ -85,6 +89,7 @@ class Paddle:
     lives: float
 
 
+# Used for powerups
 class BallModifier(Enum):
     PIERCING = "piercing"
 
@@ -97,11 +102,12 @@ class Ball:
     y_vel: float
     radius: float
     has_fallen: bool = False
-    modifier: None | BallModifier = None  # This will later probably be a list
+    modifier: None | BallModifier = None  # This will later probably be a list, but for now only one possible modifier at a time
     modifier_active_for: float = 0  # This will later probably be a list
-    max_blocks_can_pierce: int = 0
+    max_blocks_can_pierce: int = 0  # If many other modifiers are added, will be packaged up into an object
     blocks_pierced: int = 0
 
+    # Gives the ball the 'piercing' modifier
     def make_piercing(self, milliseconds, count):
         self.modifier = BallModifier.PIERCING
         self.modifier_active_for = milliseconds
@@ -114,6 +120,10 @@ class BlockType(Enum):
     POWERUP = "powerup"
     PROTECTOR = "protector"
 
+    # used when initializing the blocks
+    # each block can be a powerup block with probability_powerup chance
+    # otherwise it's a normal block
+    # (some blocks are hardcoded to be protectors, that will later be done by a levelDesign class)
     @classmethod
     def normal_or_powerup(cls, probability_powerup):
         return (
@@ -149,5 +159,5 @@ class Powerup:
     y: float
     hitbox_radius: float
 
-
+# A Union type for gameObjects that Graphics will render
 GameObject = Block | Paddle | Powerup | Ball

@@ -53,7 +53,7 @@ class GraphicsInstructions:
         )
 
 
-class Graphics:  # Does not yet support different resolutions
+class Graphics: 
     def __init__(self, graphics_settings: GraphicsSettings):
         self.__screen = pygame.display.set_mode(
             (graphics_settings.resolution_width, graphics_settings.resolution_height)
