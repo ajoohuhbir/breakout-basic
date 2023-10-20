@@ -1,3 +1,5 @@
+"""Provides classes that deal with rendering objects and UI elements to the screen"""
+
 from dataclasses import dataclass
 import pygame
 import copy
@@ -22,6 +24,8 @@ from common import (
 
 @dataclass
 class Message:
+    """Stores the data for a message to be rendered onto the screen"""
+
     text: str
     size: int
     x: float
@@ -30,17 +34,27 @@ class Message:
     color: Color = (255, 255, 255)
 
 
+# Union type for things that are rendered as UI elements by Graphics
 UIElement = SettingsSelector | Message
 
 
 @dataclass
 class GraphicsInstructions:
+    """Stores graphics instructions that are passed by GameState to Graphics, telling it what to render"""
+
     objects: list[GameObject]
     ui_elements: list[UIElement]
     graphics_settings_change: None | GraphicsSettings = None
 
     def __add__(self, other: "GraphicsInstructions"):
-        """If both have new settings, the ones in the caller are preserved"""
+        """Merges two GraphicsInstructions objects together, allowing different sources to return their own instructions
+        on what to draw, which can be merged by a parent class, instead of mutating a single object passed around between
+        the sources.
+
+        If both have new settings, the ones in the caller (i.e. a in a+b) are preserved
+
+        (This method should probably be changed to .merge(), like in audio instructions)
+        """
         new_settings = (
             self.graphics_settings_change
             if self.graphics_settings_change != None
@@ -53,7 +67,9 @@ class GraphicsInstructions:
         )
 
 
-class Graphics: 
+class Graphics:
+    """A class that renders objects and UI elements to the screen"""
+
     def __init__(self, graphics_settings: GraphicsSettings):
         self.__screen = pygame.display.set_mode(
             (graphics_settings.resolution_width, graphics_settings.resolution_height)
@@ -68,6 +84,9 @@ class Graphics:
         self.__set_game_screen()
 
     def render(self, instructions: GraphicsInstructions):
+        """Given graphics instructions, render things to the screen"""
+
+        # If new settings are detected, update affected instance variables
         if instructions.graphics_settings_change != None:
             self.graphics_settings = copy.deepcopy(
                 instructions.graphics_settings_change
@@ -76,6 +95,7 @@ class Graphics:
 
         self.__screen.fill(Colors.black)
 
+        # This separates the "game area" from the "black bars"
         pygame.draw.rect(
             self.__screen,
             Colors.dark_gray,
@@ -96,6 +116,7 @@ class Graphics:
         pygame.display.update()
 
     def __reset_resolution(self):
+        """Changes the resolution of the screen"""
         self.__screen = pygame.display.set_mode(
             (
                 self.graphics_settings.resolution_width,
@@ -109,12 +130,14 @@ class Graphics:
         self.__set_game_screen()
 
     def __render_paddle(self, paddle: Paddle):
+        """Renders the paddle"""
         self.__res_draw_rect(
             paddle.x, paddle.y, paddle.width, paddle.height, self.__paddle_color
         )
         self.__render_lives(paddle)
 
     def __render_lives(self, paddle: Paddle):
+        """Renders markings on the paddle corresponding to the number of lives"""
         num = paddle.lives
         life_width = Constants.life_width
 
@@ -137,6 +160,7 @@ class Graphics:
             )
 
     def __render_block(self, block: Block):
+        """Renders blocks"""
         self.__res_draw_rect(block.x, block.y, block.width, block.height, block.color)
         if block.block_type == BlockType.POWERUP:
             self.__res_draw_circle(
@@ -170,6 +194,7 @@ class Graphics:
             )
 
     def __render_ball(self, ball: Ball):
+        """Renders the ball"""
         self.__res_draw_circle(
             ball.x,
             ball.y,
@@ -178,12 +203,14 @@ class Graphics:
         )
 
     def __render_powerup(self, powerup: Powerup):
+        """Renders powerups"""
         if powerup.powerup_type == PowerupType.PIERCING:
             self.__render_piercing_powerup(powerup)
         elif powerup.powerup_type == PowerupType.LIFE:
             self.__render_life_powerup(powerup)
 
     def __render_piercing_powerup(self, powerup: Powerup):
+        """Renders a piercing type powerup"""
         self.__res_draw_circle(
             powerup.x,
             powerup.y,
@@ -199,6 +226,7 @@ class Graphics:
         )
 
     def __render_life_powerup(self, powerup: Powerup):
+        """Renders a life type powerup"""
         get_circle_point = lambda theta_deg: (
             powerup.x + powerup.hitbox_radius / 2 * math.cos(math.radians(theta_deg)),
             powerup.y - powerup.hitbox_radius / 2 * math.sin(math.radians(theta_deg)),
@@ -224,6 +252,7 @@ class Graphics:
         self.__res_draw_polygon(heart_points, Colors.red)
 
     def __render_object(self, obj: GameObject):
+        """Renders game objects"""
         if type(obj) == Block:
             self.__render_block(obj)
         elif type(obj) == Ball:
@@ -234,6 +263,7 @@ class Graphics:
             self.__render_powerup(obj)
 
     def __render_message(self, msg: Message):
+        """Renders UI text"""
         surf = pygame.font.SysFont(msg.font, round(self.scaling * msg.size)).render(
             msg.text, True, msg.color
         )
@@ -244,6 +274,7 @@ class Graphics:
         self.__screen.blit(surf, trect)
 
     def __render_settings_selector(self, selector: SettingsSelector):
+        """Renders the setting selector in the settings screens as two triangles surrounding the setting"""
         triangle_base = 50
         triangle_height = 50
 
@@ -291,12 +322,25 @@ class Graphics:
         self.__res_draw_polygon(second_triangle, Colors.white)
 
     def __render_ui_element(self, ui_element: UIElement):
+        """Renders UI elements"""
         if type(ui_element) == Message:
             self.__render_message(ui_element)
         elif type(ui_element) == SettingsSelector:
             self.__render_settings_selector(ui_element)
 
     def __set_game_screen(self):
+        """Sets the game screen and resolution data
+
+        The game works on an abstraction that the game coordinates are indpendent of resolution.
+        Only the graphics class 'knows' the resolution, and transforms all coordinates to actual pixel numbers
+        depending on resolution data. This method computes the resolution data that is used by other methods to transform
+        the coordinates and stores it as instance variables.
+
+        If the resolution width:height ratio is not equal to the game width:height ratio,
+        the biggest rectangle with the correct ratio that fits into the window is chosen, and the rest of the window has
+        black bars at its top/bottom or left/right. Try changing the resolution in settings (remember to press enter) and
+        see how it works.
+        """
         ratio = Constants.game_width / Constants.game_height
         res_ratio = (
             self.graphics_settings.resolution_width
@@ -333,19 +377,23 @@ class Graphics:
             ) - (self.game_screen_width / 2)
 
     def __game_x_to_resolution_x(self, x: float) -> float:
+        """Transforms the x-coordinate to actual pixels"""
         return x * self.scaling + self.game_screen_origin_x
 
     def __game_y_to_resolution_y(self, y: float) -> float:
+        """Transforms the y-coordinate to actual pixels"""
         return y * self.scaling + self.game_screen_origin_y
 
     def __game_coords_to_resolution_coords(
         self, coord: Tuple[float, float]
     ) -> Tuple[float, float]:
+        """Transforms coordinates to actual pixels"""
         x = coord[0]
         y = coord[1]
         return (self.__game_x_to_resolution_x(x), self.__game_y_to_resolution_y(y))
 
     def __res_draw_rect(self, x, y, width, height, color, border_width=0):
+        """Given abstract game coordinates, draws a rectangle in the correct resolution (pixel) coordinates"""
         pygame.draw.rect(
             self.__screen,
             color,
@@ -359,6 +407,7 @@ class Graphics:
         )
 
     def __res_draw_circle(self, x, y, radius, color, border_width=0):
+        """Given game coordinates, draws a circle in the correct resolution (pixel) coordinates"""
         pygame.draw.circle(
             self.__screen,
             color,
@@ -368,5 +417,6 @@ class Graphics:
         )
 
     def __res_draw_polygon(self, points, color):
+        """Given game coordinates, draws a polygon in the correct resolution (pixel) coordinates"""
         points = [self.__game_coords_to_resolution_coords(i) for i in points]
         pygame.draw.polygon(self.__screen, color, points)

@@ -1,3 +1,5 @@
+"""Provides a function that helps display text UI"""
+
 from common import GameFsmState, Constants
 from graphics import Message
 from settings import SettingsState
@@ -6,6 +8,8 @@ from settings import SettingsState
 def screen_content(
     game_fsm_state: GameFsmState, settings_state: SettingsState = None
 ) -> list[Message]:
+    """Takes in the current screen and returns a list of messages to be displayed"""
+
     answer = []
     if game_fsm_state == GameFsmState.MENU:
         answer.append(
@@ -131,25 +135,57 @@ def screen_content(
         answer.append(
             Message(
                 "Press A and D to move the paddle and P to pause",
-                25,
+                15,
+                Constants.game_width / 2,
+                0.2 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Try to break all the blocks",
+                15,
                 Constants.game_width / 2,
                 0.3 * Constants.game_height,
             )
         )
         answer.append(
             Message(
-                "Try to break all the blocks",
-                25,
+                "If your ball falls off the screen, you lose health. If your health reaches 0, you lose.",
+                15,
+                Constants.game_width / 2,
+                0.4 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Blocks with a circle give you powerups or replenish your health",
+                15,
                 Constants.game_width / 2,
                 0.5 * Constants.game_height,
             )
         )
         answer.append(
             Message(
-                "If your ball falls off the screen, you lose",
-                25,
+                "Blocks with a red boundary must be hit twice (or hit with piercing)",
+                15,
+                Constants.game_width / 2,
+                0.6 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "White blocks protect three blocks under them from all damage until the white blocks are themselves destroyed",
+                15,
                 Constants.game_width / 2,
                 0.7 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Good Luck!",
+                25,
+                Constants.game_width / 2,
+                0.8 * Constants.game_height,
             )
         )
         answer.append(
@@ -168,6 +204,14 @@ def screen_content(
                 50,
                 Constants.game_width / 2,
                 0.05 * Constants.game_height,
+            )
+        )
+        answer.append(
+            Message(
+                "Changes won't be applied until you press enter",
+                20,
+                Constants.game_width / 2,
+                0.15 * Constants.game_height,
             )
         )
         answer.append(

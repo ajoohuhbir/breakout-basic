@@ -1,3 +1,5 @@
+"""Executes all the code and calls upon the other modules"""
+
 import pygame
 
 
@@ -8,12 +10,14 @@ from inputs import KeyboardState
 
 
 def check_invariants(game: GameState, graphics: Graphics):
+    """Makes sure that certain conditions are true, so that the game is consistent"""
     assert game.settings.graphics_settings == graphics.graphics_settings
     if game.settings_state != None:
         assert game.settings == game.settings_state.settings
 
 
 def GameLoop():
+    """The main loop of the game. Initializes classes and repeatedly updates them"""
     game = GameState()
     clock = pygame.time.Clock()
     audio = Audio()
@@ -37,6 +41,7 @@ def GameLoop():
 
 
 def main():
+    """Puts everything together and runs the program"""
     pygame.init()
     pygame.display.set_caption("Breakout")
     GameLoop()

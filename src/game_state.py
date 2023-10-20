@@ -1,3 +1,5 @@
+"""Provides a class to hold the state data for the program"""
+
 from enum import Enum
 from typing import Tuple
 import copy
@@ -13,6 +15,8 @@ from screen_content import screen_content
 
 
 class GameState:
+    """Holds all state data for the program"""
+
     def __init__(self):
         self.game_fsm_state = GameFsmState.MENU
         self.game_exit = False
@@ -22,7 +26,12 @@ class GameState:
     def update(
         self, total_delta_t: float, keyboard_state: KeyboardState
     ) -> Tuple[AudioInstructions, GraphicsInstructions]:
+        """Updates the game state data, taking in the time between frames and keyboard inputs"""
+
+        # The keys currently pressed
         keys = keyboard_state.get_keys()
+
+        # This will be built upon and return to Graphics to play
         graphics_instructions = GraphicsInstructions([], [], None)
 
         next_fsm_state = self.__next_fsm_state(keyboard_state)
@@ -30,6 +39,7 @@ class GameState:
         transition_audio_instructions = AudioInstructions([], None)
         collision_sounds = AudioInstructions([], None)
 
+        # If appropriate, do a state transition and queue all the required audiovisual changes
         if next_fsm_state != None:
             transition_audio_instructions = state_transition_audio(
                 self.game_fsm_state, next_fsm_state
@@ -38,23 +48,32 @@ class GameState:
 
         objects = []
         ui_elements = []
+
+        # If the game is being played (i.e. not in a menu screen type of state)
+        # Update the game physics and get the objects to render and sounds to play from that
         if self.game_fsm_state in [
             GameFsmState.PLAY,
             GameFsmState.PAUSE,
             GameFsmState.PRE_PLAY,
-        ]:  # Should this be a set?
+        ]:
             sounds, objects = self.core_game_state.update(
                 total_delta_t, keys, self.game_fsm_state
             )
             collision_sounds = AudioInstructions(sounds, None)
+
+        # deals with the settings menu state
         elif self.game_fsm_state == GameFsmState.SETTINGS:
+            # Update settings if needed
             new_settings, ui_elements = self.settings_state.update(keyboard_state)
             if new_settings != None:
+                # Settings mutates its own copy of the settings, only updating GameState's copy of settings
+                # Once a change is made
                 self.settings = copy.deepcopy(new_settings)
                 graphics_instructions += GraphicsInstructions(
                     [], [], new_settings.graphics_settings
                 )
 
+        # Stores the UI elements to render depending on the current screen
         screen_ui = (
             screen_content(self.game_fsm_state)
             if self.game_fsm_state != GameFsmState.SETTINGS
@@ -66,15 +85,18 @@ class GameState:
         )
         ui_graphics = GraphicsInstructions([], ui_elements)
 
+        # Merge the graphics and audio instructions from separate sources into singular returnable objects
         audio_instructions = transition_audio_instructions.merge(collision_sounds)
         graphics_instructions += screen_graphics + ui_graphics
 
         return audio_instructions, graphics_instructions
 
     def __initialize_game(self):
+        """Called when a game first starts, building a CoreGameState object"""
         self.core_game_state = CoreGameState()
 
     def __next_fsm_state(self, keyboard_state: KeyboardState) -> GameFsmState | None:
+        """Checks whether we need to do a screen transition. If yes, it returns the next GameFsmState"""
         keys = keyboard_state.get_keys()
 
         if self.game_fsm_state == GameFsmState.MENU:
@@ -126,6 +148,7 @@ class GameState:
             self.game_exit = True
 
     def __on_transition(self, next_state: GameFsmState):
+        """If we do need to do a screen transition, this executes the necessary effects"""
         if next_state == GameFsmState.PRE_PLAY:
             if self.game_fsm_state in [
                 GameFsmState.MENU,
@@ -158,6 +181,7 @@ def state_transition_audio(
     current_state: GameFsmState,
     target_state: GameFsmState,
 ) -> AudioInstructions:
+    """Returns audio instructions corresponding to a state transition i.e. changing the music"""
     sounds = []
     new_music = None
     if target_state == GameFsmState.GAME_WIN:

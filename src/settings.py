@@ -1,3 +1,5 @@
+"""Provides classes to deal with game settings and the screen in which those settings can be changed"""
+
 from dataclasses import dataclass
 import pygame
 import copy
@@ -6,29 +8,34 @@ from typing import Tuple
 from common import Settings, Constants
 from inputs import KeyboardState
 
-# This module deals with the settings screen
 
 @dataclass
 class SettingsSelector:
+    """Data for the settings selector, which indicates which setting to change"""
+
     x: float
     y: float
     width: int
 
 
 class SettingsState:
+    """Analogous to CoreGameState, this stores data relevant to the settings screen"""
+
     possible_settings = ["Resolution", "FPS"]
     possible_resolutions = [(800, 600), (1080, 720), (400, 300)]
-    
+
     # how wide the selector needs be for each setting
     # this is a temporary solution because there aren't too many settings right now
     # if I add lots more settings all this information will probably be wrapped in an object
-    selector_width_for_each_setting = [600, 400]        
+    selector_width_for_each_setting = [600, 400]
 
     def __init__(self, settings: Settings):
         self.changed = False
         self.selector_at = 1
         self.selector = SettingsSelector(
-            Constants.game_width / 2, 0.4 * Constants.game_height, self.selector_width_for_each_setting[self.selector_at]
+            Constants.game_width / 2,
+            0.4 * Constants.game_height,
+            self.selector_width_for_each_setting[self.selector_at],
         )
         self.temp_fps = settings.fps
         self.temp_resolution = SettingsState.possible_resolutions.index(
@@ -42,6 +49,12 @@ class SettingsState:
     def update(
         self, keyboard_state: KeyboardState
     ) -> Tuple[Settings, list[SettingsSelector]]:
+        """Updates the settings screen depending on user input
+
+        Stores its own copy of settings that are changed, updating self.settings only if new settings are chosen
+        Temp instance variables store the settings that have been changed but not applied (by pressing enter)
+        """
+
         keys = keyboard_state.new_keys_pressed
 
         new_settings = copy.deepcopy(self.settings)
