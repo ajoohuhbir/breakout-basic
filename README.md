@@ -41,3 +41,6 @@ In practice, this means that components do not 'know' about any state data not d
 This also separates actual state calculations from any I/O, such as user input or audio-visual output, making it easier to track down which component is a source of bugs.
 
 All code is formatted with [Black](https://pypi.org/project/black/)
+
+# Acknowledgements
+All music taken from [Pixabay](https://pixabay.com/music/search/genre/video%20games/)
