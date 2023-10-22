@@ -35,7 +35,7 @@ Block types - protector, healthier
 Fix hardcoding (settings screen, block generation, etc.)
 Fix screen_content being non-interactive
     Use algebraic datatypes
-Make the damn music match
+Make the music match
 
 POSSIBLE FUTURE FEATURES:
 Block "Health"
@@ -62,13 +62,3 @@ X Lives and powerup block signs aren't resolution invariant
 Paddle movement wonky
 Piercing is latent and sometimes doesn't work
     I suspect this is because wall collisions don't reset blocks_pierced
-
-QUESTIONS:
-X Isn't rendering only the changing parts of a screen more "efficient"?
-X GameObjects inheritance
-X Should I use sets in the input handler? Is that better?
-X Ask about "backwards programming"
-X One "Data" class can suffice for settings, constants etc. Is this inheritance? Can I just use less classes?
-X Awkwardness : Storing lives inside paddle
-X Awkwardness : GameState reaching inside core game state to set ball velocity when launched
-X Awkwardness : Isn’t “constants” doing too much “heavy lifting” rn?
